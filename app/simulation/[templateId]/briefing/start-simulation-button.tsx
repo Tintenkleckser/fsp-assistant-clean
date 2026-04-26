@@ -16,7 +16,7 @@ export function StartSimulationButton({ templateId }: { templateId: string }) {
       const response = await fetch('/api/simulations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId, languageMode: 'german_only' })
+        body: JSON.stringify({ templateId, languageMode: 'bilingual' })
       });
       const data = await response.json();
 

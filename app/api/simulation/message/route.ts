@@ -46,6 +46,13 @@ export async function POST(request: NextRequest) {
 Du bist Teil einer FSP-Uebung. Antworte in deiner Rolle, knapp und realistisch.
 Bleibe im Szenario. Bewerte den Kandidaten noch nicht, sondern fuehre die Simulation fort.
 Wenn der Kandidat medizinische Fachsprache gegenueber einem Patienten verwendet, reagiere als Patient verstaendnislos.
+Die Zielgruppe sind Aerztinnen und Aerzte aus der Tuerkei, die Deutsch fuer die Fachsprachenpruefung lernen.
+${simulation.languageMode === 'bilingual'
+  ? `Antwortformat:
+1. Rolle: Antworte zuerst auf Deutsch in der Pruefungsrolle.
+2. TR Koçluk: Gib danach auf Tuerkisch maximal zwei kurze Hinweise: eine bessere deutsche Formulierung oder ein relevantes Wort, und einen Zeit-/Strukturhinweis.
+Die tuerkische Hilfe darf nicht die ganze Loesung ersetzen.`
+  : 'Antworte ausschliesslich auf Deutsch in der Pruefungsrolle.'}
 `;
 
     const llmResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {

@@ -39,6 +39,9 @@ export default async function EvaluationPage({ params }: { params: { simId: stri
   const average = scoreEntries.length > 0
     ? scoreEntries.reduce((sum, [, value]) => sum + Number(value || 0), 0) / scoreEntries.length
     : 0;
+  const elapsedMinutes = simulation.completedAt
+    ? Math.max(0, Math.round((simulation.completedAt.getTime() - simulation.startedAt.getTime()) / 60000))
+    : null;
   const checklistResults = Array.isArray(simulation.evaluation.checklistResults)
     ? simulation.evaluation.checklistResults as ChecklistResult[]
     : [];
@@ -50,7 +53,10 @@ export default async function EvaluationPage({ params }: { params: { simId: stri
           <div>
             <p className="text-sm font-semibold text-medical">Auswertung</p>
             <h1 className="mt-1 text-2xl font-bold text-ink">{simulation.template.titleDe}</h1>
-            <p className="mt-1 text-sm text-slate-600">Durchschnitt: {average.toFixed(1)} / 10</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Durchschnitt: {average.toFixed(1)} / 10
+              {elapsedMinutes !== null ? ` · Zeit: ${elapsedMinutes} Minuten` : ''}
+            </p>
           </div>
           <Link href="/dashboard" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
             Dashboard
@@ -78,10 +84,18 @@ export default async function EvaluationPage({ params }: { params: { simId: stri
           </article>
 
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-ink">Feedback</h2>
+            <h2 className="font-semibold text-ink">Feedback Deutsch</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
               {simulation.evaluation.feedbackDe}
             </p>
+            {simulation.evaluation.feedbackTr ? (
+              <div className="mt-5 rounded-md bg-mint p-4">
+                <h3 className="text-sm font-semibold text-ink">Turkce kocluk</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                  {simulation.evaluation.feedbackTr}
+                </p>
+              </div>
+            ) : null}
           </article>
         </section>
 

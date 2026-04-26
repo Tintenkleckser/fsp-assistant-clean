@@ -39,8 +39,12 @@ export default async function ChatPage({
       simId={simulation.id}
       templateId={simulation.templateId}
       title={simulation.template.titleDe}
+      titleTr={simulation.template.titleTr}
       description={simulation.template.descriptionDe}
+      descriptionTr={simulation.template.descriptionTr}
       maxTurns={simulation.template.maxTurns}
+      languageMode={simulation.languageMode}
+      startedAt={simulation.startedAt.toISOString()}
       initialInteractions={simulation.interactions}
     />
   );

@@ -41,17 +41,28 @@ export default async function BriefingPage({ params }: { params: { templateId: s
         <section className="py-8">
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="font-semibold text-ink">Briefing</h2>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
-              {template.descriptionDe}
-            </p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-medical">Deutsch</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                  {template.descriptionDe}
+                </p>
+              </div>
+              <div className="rounded-md bg-mint p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink">Tuerkisch</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                  {template.descriptionTr || 'Tuerkische Zusammenfassung wird bei neuen Szenarien erzeugt.'}
+                </p>
+              </div>
+            </div>
             <dl className="mt-5 grid gap-3 text-sm md:grid-cols-3">
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-slate-500">Schwierigkeit</dt>
                 <dd className="mt-1 font-semibold text-ink">{template.difficulty}</dd>
               </div>
               <div className="rounded-md bg-slate-50 p-3">
-                <dt className="text-slate-500">Max. Turns</dt>
-                <dd className="mt-1 font-semibold text-ink">{template.maxTurns}</dd>
+                <dt className="text-slate-500">Pruefungszeit</dt>
+                <dd className="mt-1 font-semibold text-ink">20 Minuten</dd>
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-slate-500">Checkliste</dt>
@@ -67,10 +78,13 @@ export default async function BriefingPage({ params }: { params: { templateId: s
             ) : (
               <ul className="mt-4 space-y-3">
                 {checklist.map((item, index) => {
-                  const entry = item as { textDe?: string; category?: string; weight?: number };
+                  const entry = item as { textDe?: string; textTr?: string; category?: string; weight?: number };
                   return (
                     <li key={`${entry.textDe}-${index}`} className="rounded-md border border-slate-100 bg-slate-50 p-3">
                       <p className="text-sm font-semibold text-ink">{entry.textDe ?? `Punkt ${index + 1}`}</p>
+                      {entry.textTr ? (
+                        <p className="mt-1 text-sm leading-6 text-slate-600">{entry.textTr}</p>
+                      ) : null}
                       <p className="mt-1 text-xs text-slate-500">
                         {entry.category ?? 'Kommunikation'} · Gewichtung {entry.weight ?? 1}
                       </p>

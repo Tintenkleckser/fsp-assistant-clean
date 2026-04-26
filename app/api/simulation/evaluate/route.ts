@@ -55,6 +55,9 @@ export async function POST(request: NextRequest) {
     const checklist = Array.isArray(simulation.template.checklist)
       ? simulation.template.checklist
       : [];
+    const elapsedMinutes = simulation.startedAt
+      ? Math.max(0, Math.round((Date.now() - simulation.startedAt.getTime()) / 60000))
+      : null;
     const transcript = simulation.interactions
       .map((interaction) => `Kandidat: ${interaction.userInput}\nGegenrolle: ${interaction.aiResponse}`)
       .join('\n\n');
@@ -70,18 +73,24 @@ ${simulation.template.descriptionDe}
 CHECKLISTE:
 ${JSON.stringify(checklist, null, 2)}
 
+ZEIT:
+Empfohlenes Pruefungslimit: 20 Minuten
+Tatsaechliche Uebungsdauer bis zur Auswertung: ${elapsedMinutes ?? 'unbekannt'} Minuten
+Sprachmodus: ${simulation.languageMode}
+
 GESPEICHERTER GESPRACHSVERLAUF:
 ${transcript || 'Keine Interaktionen vorhanden.'}
 
 Antworte ausschliesslich als valides JSON:
 {
   "feedbackDe": "Ausfuehrliches Feedback auf Deutsch mit Staerken, Verbesserungen und 3 konkreten Beispielsatz-Alternativen.",
-  "feedbackTr": "Kurze tuerkische Zusammenfassung des Feedbacks.",
+  "feedbackTr": "Tuerkisches Coaching: Sprachfehler, bessere deutsche Formulierungen, Pruefungsstrategie und Zeitmanagement.",
   "scores": {
     "struktur": 0-10,
     "verstaendlichkeit": 0-10,
     "fachsprache": 0-10,
-    "empathie": 0-10
+    "empathie": 0-10,
+    "zeitmanagement": 0-10
   },
   "checklistResults": [
     {"id":"1","fulfilled":true,"score":0-10,"commentDe":"Kurzer Kommentar","commentTr":"Kisa yorum"}
