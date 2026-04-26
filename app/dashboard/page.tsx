@@ -36,6 +36,15 @@ export default async function DashboardPage() {
           </Link>
         </header>
 
+        <div className="mt-6">
+          <Link
+            href="/simulation/new"
+            className="inline-flex rounded-md bg-medical px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-700"
+          >
+            Neue Uebung starten
+          </Link>
+        </div>
+
         <section className="grid gap-4 py-8 md:grid-cols-3">
           {[
             ['Anamnese', 'Arzt-Patient-Gespraech in Laiensprache'],
