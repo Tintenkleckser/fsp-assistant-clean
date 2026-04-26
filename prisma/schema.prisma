@@ -1,0 +1,128 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id             String           @id @default(uuid())
+  email          String           @unique
+  nativeLanguage String           @default("tr") @map("native_language")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  simulations    UserSimulation[]
+  progress       FspProgress[]
+
+  @@map("profiles")
+}
+
+model SimulationTemplate {
+  id                 String           @id @default(uuid())
+  domain             String           @default("nursing")
+  type               String           @default("oral_exam")
+  difficulty         String           @default("intermediate")
+  titleDe            String           @map("title_de")
+  titleTr            String           @map("title_tr")
+  descriptionDe      String           @map("description_de") @db.Text
+  descriptionTr      String           @map("description_tr") @db.Text
+  systemPrompt       String           @map("system_prompt") @db.Text
+  evaluationCriteria Json             @default("[]") @map("evaluation_criteria")
+  checklist          Json             @default("[]")
+  maxTurns           Int              @default(8) @map("max_turns")
+  simulations        UserSimulation[]
+
+  @@map("simulation_templates")
+}
+
+model UserSimulation {
+  id             String                  @id @default(uuid())
+  userId         String                  @map("user_id")
+  templateId     String                  @map("template_id")
+  status         String                  @default("in_progress")
+  languageMode   String                  @default("bilingual") @map("language_mode")
+  documentation  String?                 @db.Text
+  startedAt      DateTime                @default(now()) @map("started_at")
+  completedAt    DateTime?               @map("completed_at")
+  user           Profile                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template       SimulationTemplate      @relation(fields: [templateId], references: [id])
+  interactions   SimulationInteraction[]
+  evaluation     Evaluation?
+
+  @@map("user_simulations")
+}
+
+model SimulationInteraction {
+  id           String         @id @default(uuid())
+  simulationId String         @map("simulation_id")
+  turnNumber   Int            @map("turn_number")
+  userInput    String         @map("user_input") @db.Text
+  aiResponse   String         @map("ai_response") @db.Text
+  createdAt    DateTime       @default(now()) @map("created_at")
+  simulation   UserSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+
+  @@map("simulation_interactions")
+}
+
+model Evaluation {
+  id                 String         @id @default(uuid())
+  simulationId       String         @unique @map("simulation_id")
+  feedbackDe         String         @map("feedback_de") @db.Text
+  feedbackTr         String         @map("feedback_tr") @db.Text
+  scores             Json           @default("{}")
+  checklistResults   Json           @default("[]") @map("checklist_results")
+  docFeedbackDe      String?        @map("doc_feedback_de") @db.Text
+  docFeedbackTr      String?        @map("doc_feedback_tr") @db.Text
+  docScore           Int?           @map("doc_score")
+  coachingFeedbackDe String?        @map("coaching_feedback_de") @db.Text
+  coachingFeedbackTr String?        @map("coaching_feedback_tr") @db.Text
+  createdAt          DateTime       @default(now()) @map("created_at")
+  simulation         UserSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+
+  @@map("evaluations")
+}
+
+model GlossaryTerm {
+  id        String @id @default(uuid())
+  termDe    String @map("term_de")
+  termTr    String @map("term_tr")
+  contextDe String @map("context_de") @db.Text
+  contextTr String @map("context_tr") @db.Text
+
+  @@map("glossary_terms")
+}
+
+model FspProgress {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  sessionDate      DateTime @default(now()) @map("session_date")
+  topic            String?
+  proficiencyLevel Int?     @map("proficiency_level")
+  feedbackSummary  String?  @map("feedback_summary") @db.Text
+  newVocabulary    String[] @default([]) @map("new_vocabulary")
+  rawTranscript    String?  @map("raw_transcript") @db.Text
+  simulationId     String?  @map("simulation_id")
+  simulationType   String?  @map("simulation_type")
+  user             Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionDate(sort: Desc)])
+  @@map("fsp_progress")
+}
+
+model HandbookSection {
+  id         String   @id @default(uuid())
+  domain     String   @default("nursing")
+  partNumber Int      @map("part_number")
+  sectionIdx Int      @map("section_idx")
+  title      String   @db.Text
+  content    String   @db.Text
+  keywords   String[] @default([])
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([domain])
+  @@index([partNumber])
+  @@map("handbook_sections")
+}
