@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 type Interaction = {
@@ -25,10 +26,12 @@ export function ChatClient({
   maxTurns: number;
   initialInteractions: Interaction[];
 }) {
+  const router = useRouter();
   const [interactions, setInteractions] = useState(initialInteractions);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
 
   async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,6 +63,31 @@ export function ChatClient({
       setMessage(text);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function finishAndEvaluate() {
+    setEvaluating(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/simulation/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ simId })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data?.error ?? 'Auswertung konnte nicht erstellt werden.');
+        return;
+      }
+
+      router.push(`/evaluation/${simId}`);
+    } catch {
+      setError('Netzwerkfehler bei der Auswertung.');
+    } finally {
+      setEvaluating(false);
     }
   }
 
@@ -120,9 +148,19 @@ export function ChatClient({
               />
             </label>
             <div className="mt-3 flex flex-wrap justify-between gap-3">
-              <Link href="/dashboard" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
-                Dashboard
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/dashboard" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
+                  Dashboard
+                </Link>
+                <button
+                  type="button"
+                  onClick={finishAndEvaluate}
+                  disabled={evaluating || loading || interactions.length === 0}
+                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {evaluating ? 'Wird ausgewertet...' : 'Simulation beenden'}
+                </button>
+              </div>
               <button
                 type="submit"
                 disabled={loading || !message.trim()}
