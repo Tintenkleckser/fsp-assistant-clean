@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
+import { SIMULATION_TYPES } from '@/lib/topic-categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,18 @@ export default async function EvaluationPage({ params }: { params: { simId: stri
   const checklistResults = Array.isArray(simulation.evaluation.checklistResults)
     ? simulation.evaluation.checklistResults as ChecklistResult[]
     : [];
+  const fullExamTemplates = simulation.template.domain.startsWith('full_exam:')
+    ? await prisma.simulationTemplate.findMany({
+        where: { domain: simulation.template.domain }
+      })
+    : [];
+  const orderedFullExamTemplates = fullExamTemplates.sort((a, b) => {
+    const aIndex = SIMULATION_TYPES.findIndex((item) => item.id === a.type);
+    const bIndex = SIMULATION_TYPES.findIndex((item) => item.id === b.type);
+    return aIndex - bIndex;
+  });
+  const currentPartIndex = orderedFullExamTemplates.findIndex((part) => part.id === simulation.templateId);
+  const nextPart = currentPartIndex >= 0 ? orderedFullExamTemplates[currentPartIndex + 1] : null;
 
   return (
     <main className="min-h-screen px-5 py-8">
@@ -62,6 +75,31 @@ export default async function EvaluationPage({ params }: { params: { simId: stri
             Dashboard
           </Link>
         </header>
+
+        {orderedFullExamTemplates.length > 0 ? (
+          <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-ink">Gesamtpruefung</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Teil {currentPartIndex + 1} von {orderedFullExamTemplates.length} abgeschlossen
+                </p>
+              </div>
+              {nextPart ? (
+                <Link
+                  href={`/simulation/${nextPart.id}/briefing`}
+                  className="rounded-md bg-medical px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Naechsten Teil starten
+                </Link>
+              ) : (
+                <p className="rounded bg-mint px-3 py-2 text-sm font-semibold text-ink">
+                  Gesamtpruefung abgeschlossen
+                </p>
+              )}
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-4 py-8 md:grid-cols-[0.8fr_1.2fr]">
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">

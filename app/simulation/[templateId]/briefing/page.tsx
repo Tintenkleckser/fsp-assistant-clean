@@ -24,6 +24,17 @@ export default async function BriefingPage({ params }: { params: { templateId: s
 
   const simulationType = SIMULATION_TYPES.find((item) => item.id === template.type);
   const checklist = Array.isArray(template.checklist) ? template.checklist : [];
+  const fullExamTemplates = template.domain.startsWith('full_exam:')
+    ? await prisma.simulationTemplate.findMany({
+        where: { domain: template.domain },
+        orderBy: { type: 'asc' }
+      })
+    : [];
+  const orderedFullExamTemplates = fullExamTemplates.sort((a, b) => {
+    const aIndex = SIMULATION_TYPES.findIndex((item) => item.id === a.type);
+    const bIndex = SIMULATION_TYPES.findIndex((item) => item.id === b.type);
+    return aIndex - bIndex;
+  });
 
   return (
     <main className="min-h-screen px-5 py-8">
@@ -32,6 +43,9 @@ export default async function BriefingPage({ params }: { params: { templateId: s
           <div>
             <p className="text-sm font-semibold text-medical">{simulationType?.label ?? 'FSP-Uebung'}</p>
             <h1 className="mt-1 text-2xl font-bold text-ink">{template.titleDe}</h1>
+            {orderedFullExamTemplates.length > 0 ? (
+              <p className="mt-1 text-sm text-slate-600">Teil einer zusammenhaengenden Gesamtpruefung</p>
+            ) : null}
           </div>
           <Link href="/simulation/new" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
             Auswahl
@@ -39,6 +53,27 @@ export default async function BriefingPage({ params }: { params: { templateId: s
         </header>
 
         <section className="py-8">
+          {orderedFullExamTemplates.length > 0 ? (
+            <article className="mb-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="font-semibold text-ink">Gesamtpruefung</h2>
+              <ol className="mt-4 grid gap-3 md:grid-cols-3">
+                {orderedFullExamTemplates.map((partTemplate, index) => (
+                  <li
+                    key={partTemplate.id}
+                    className={`rounded-md border p-3 text-sm ${
+                      partTemplate.id === template.id ? 'border-medical bg-mint' : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <Link href={`/simulation/${partTemplate.id}/briefing`} className="block">
+                      <span className="text-xs font-semibold text-medical">Teil {index + 1}</span>
+                      <span className="mt-1 block font-semibold text-ink">{partTemplate.titleDe}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </article>
+          ) : null}
+
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="font-semibold text-ink">Briefing</h2>
             <div className="mt-3 grid gap-4 md:grid-cols-2">

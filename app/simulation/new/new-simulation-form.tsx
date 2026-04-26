@@ -3,7 +3,14 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { DIFFICULTY_LEVELS, SIMULATION_TYPES, type DifficultyId, type SimulationTypeId } from '@/lib/topic-categories';
+import {
+  DIFFICULTY_LEVELS,
+  PRACTICE_MODES,
+  SIMULATION_TYPES,
+  type DifficultyId,
+  type PracticeModeId,
+  type SimulationTypeId
+} from '@/lib/topic-categories';
 
 type TemplatePreview = {
   id: string;
@@ -15,6 +22,7 @@ type TemplatePreview = {
 
 export function NewSimulationForm({ recentTemplates }: { recentTemplates: TemplatePreview[] }) {
   const router = useRouter();
+  const [practiceMode, setPracticeMode] = useState<PracticeModeId>(PRACTICE_MODES[0].id);
   const [simulationType, setSimulationType] = useState<SimulationTypeId>(SIMULATION_TYPES[0].id);
   const [difficulty, setDifficulty] = useState<DifficultyId>(DIFFICULTY_LEVELS[1].id);
   const [loading, setLoading] = useState(false);
@@ -28,7 +36,7 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
       const response = await fetch('/api/simulation/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ simulationType, difficulty })
+        body: JSON.stringify({ practiceMode, simulationType, difficulty })
       });
       const data = await response.json();
 
@@ -37,7 +45,7 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
         return;
       }
 
-      router.push(`/simulation/${data.id}/briefing`);
+      router.push(`/simulation/${data.firstTemplateId ?? data.id}/briefing`);
     } catch {
       setError('Netzwerkfehler bei der Szenario-Erzeugung.');
     } finally {
@@ -60,28 +68,25 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
 
         <section className="grid gap-5 py-8 md:grid-cols-[1fr_1fr]">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-ink">1. Pruefungsteil</h2>
+            <h2 className="font-semibold text-ink">1. Uebungsform</h2>
             <div className="mt-4 space-y-3">
-              {SIMULATION_TYPES.map((item) => (
+              {PRACTICE_MODES.map((item) => (
                 <label
                   key={item.id}
                   className={`block cursor-pointer rounded-md border p-4 ${
-                    simulationType === item.id ? 'border-medical bg-mint' : 'border-slate-200 bg-white'
+                    practiceMode === item.id ? 'border-medical bg-mint' : 'border-slate-200 bg-white'
                   }`}
                 >
                   <input
                     className="sr-only"
                     type="radio"
-                    name="simulationType"
+                    name="practiceMode"
                     value={item.id}
-                    checked={simulationType === item.id}
-                    onChange={() => setSimulationType(item.id)}
+                    checked={practiceMode === item.id}
+                    onChange={() => setPracticeMode(item.id)}
                   />
                   <span className="font-semibold text-ink">{item.label}</span>
                   <span className="mt-1 block text-sm leading-6 text-slate-600">{item.description}</span>
-                  <span className="mt-2 inline-block rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
-                    {item.timeLimitMin} Minuten
-                  </span>
                 </label>
               ))}
             </div>
@@ -110,7 +115,51 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
                 </label>
               ))}
             </div>
+          </div>
 
+          {practiceMode === 'single_part' ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="font-semibold text-ink">3. Pruefungsteil</h2>
+            <div className="mt-4 space-y-3">
+              {SIMULATION_TYPES.map((item) => (
+                <label
+                  key={item.id}
+                  className={`block cursor-pointer rounded-md border p-4 ${
+                    simulationType === item.id ? 'border-medical bg-mint' : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <input
+                    className="sr-only"
+                    type="radio"
+                    name="simulationType"
+                    value={item.id}
+                    checked={simulationType === item.id}
+                    onChange={() => setSimulationType(item.id)}
+                  />
+                  <span className="font-semibold text-ink">{item.label}</span>
+                  <span className="mt-1 block text-sm leading-6 text-slate-600">{item.description}</span>
+                  <span className="mt-2 inline-block rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                    {item.timeLimitMin} Minuten
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          ) : (
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="font-semibold text-ink">3. Fallkette</h2>
+            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+              {SIMULATION_TYPES.map((item, index) => (
+                <li key={item.id} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <span className="font-semibold text-ink">Teil {index + 1}: {item.short}</span>
+                  <span className="mt-1 block">{item.description}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          )}
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             {error ? (
               <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {error}
@@ -123,7 +172,7 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
               className="mt-5 w-full rounded-md bg-medical px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
             >
-              {loading ? 'Szenario wird erzeugt...' : 'Uebung erzeugen'}
+              {loading ? 'Szenario wird erzeugt...' : practiceMode === 'full_exam' ? 'Gesamtpruefung erzeugen' : 'Uebung erzeugen'}
             </button>
           </div>
         </section>

@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
-import { getDifficulty, getSimulationType } from '@/lib/topic-categories';
+import { SIMULATION_TYPES, getDifficulty, getPracticeMode, getSimulationType } from '@/lib/topic-categories';
 
 export const dynamic = 'force-dynamic';
+
+type GeneratedExamPart = {
+  type?: string;
+  titleDe?: string;
+  titleTr?: string;
+  descriptionDe?: string;
+  descriptionTr?: string;
+  systemPrompt?: string;
+  evaluationCriteria?: unknown;
+  checklist?: unknown;
+};
 
 function extractJson(content: string) {
   const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -17,6 +28,10 @@ function extractJson(content: string) {
   return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
 }
 
+function maxTurnsForDifficulty(difficultyId: string) {
+  return difficultyId === 'beginner' ? 8 : difficultyId === 'intermediate' ? 10 : 12;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
@@ -26,9 +41,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const difficulty = getDifficulty(String(body?.difficulty ?? ''));
+    const practiceMode = getPracticeMode(String(body?.practiceMode ?? 'single_part')) ?? getPracticeMode('single_part');
     const simulationType = getSimulationType(String(body?.simulationType ?? ''));
 
-    if (!difficulty || !simulationType) {
+    if (!difficulty || !practiceMode || (practiceMode.id === 'single_part' && !simulationType)) {
       return NextResponse.json({ error: 'Pruefungsteil und Schwierigkeit sind erforderlich.' }, { status: 400 });
     }
 
@@ -36,7 +52,112 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'MISTRAL_API_KEY fehlt in Vercel.' }, { status: 500 });
     }
 
-    const maxTurns = difficulty.id === 'beginner' ? 8 : difficulty.id === 'intermediate' ? 10 : 12;
+    const maxTurns = maxTurnsForDifficulty(difficulty.id);
+
+    if (practiceMode.id === 'full_exam') {
+      const examId = `fsp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const prompt = `Du bist ein Experte fuer die deutsche Fachsprachenpruefung fuer internationale Aerztinnen und Aerzte.
+
+Erstelle EINE zusammenhaengende komplette FSP-Pruefung als Fallkette.
+
+Schwierigkeit: ${difficulty.label} - ${difficulty.description}
+
+Wichtig:
+- Alle drei Pruefungsteile muessen denselben Patientenfall verwenden.
+- Teil 1: Arzt-Patienten-Gespraech, laienverstaendlich, Anamnese.
+- Teil 2: Dokumentation, Aufnahmebericht/Kurzdokumentation auf Grundlage desselben Falls.
+- Teil 3: Arzt-Arzt-Gespraech, strukturierte Fallvorstellung desselben Falls in Fachsprache.
+- Die Informationen duerfen sich ueber die Teile entwickeln, aber nicht widersprechen.
+- Zielgruppe: Aerztinnen und Aerzte aus der Tuerkei, zweisprachige Lernhilfe Deutsch/Tuerkisch.
+- Es geht um Sprachkompetenz, Struktur, Zeitmanagement und Pruefungsstrategie.
+
+Antworte ausschliesslich als valides JSON:
+{
+  "caseTitleDe": "Kurzer deutscher Titel des Gesamtfalls",
+  "caseTitleTr": "Kurzer tuerkischer Titel des Gesamtfalls",
+  "parts": [
+    {
+      "type": "patient_conversation",
+      "titleDe": "Teil 1: ...",
+      "titleTr": "Bolum 1: ...",
+      "descriptionDe": "Konkrete Aufgabenstellung auf Deutsch, 3-5 Saetze",
+      "descriptionTr": "Tuerkische Orientierung",
+      "systemPrompt": "Ausfuehrliche Rollenbeschreibung fuer den Chat, mindestens 180 Woerter",
+      "evaluationCriteria": ["Kriterium 1", "Kriterium 2"],
+      "checklist": [
+        {"id":"1","textDe":"Pruefpunkt","textTr":"Tuerkische Uebersetzung","category":"Kommunikation","weight":2}
+      ]
+    }
+  ]
+}
+
+Erzeuge genau 3 parts in dieser Reihenfolge: patient_conversation, documentation, doctor_conversation.
+Jede Checkliste: 8 bis 12 Items. weight: 1 normal, 2 wichtig, 3 kritisch.`;
+
+      const llmResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'mistral-large-latest',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          max_tokens: 5000,
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (!llmResponse.ok) {
+        const message = await llmResponse.text().catch(() => '');
+        console.error('Mistral full exam generate error:', llmResponse.status, message);
+        return NextResponse.json({ error: 'LLM-API-Fehler bei der Gesamtpruefung.' }, { status: 502 });
+      }
+
+      const data = await llmResponse.json();
+      const content = data?.choices?.[0]?.message?.content ?? '{}';
+      const parsed = extractJson(content);
+      const parts: GeneratedExamPart[] = Array.isArray(parsed.parts) ? parsed.parts : [];
+
+      const templates = await Promise.all(SIMULATION_TYPES.map((part, index) => {
+        const parsedPart = parts.find((item) => item?.type === part.id) ?? parts[index] ?? {};
+
+        return prisma.simulationTemplate.create({
+          data: {
+            domain: `full_exam:${examId}`,
+            type: part.id,
+            difficulty: difficulty.id,
+            titleDe: String(parsedPart.titleDe ?? `Teil ${index + 1}: ${part.short}`),
+            titleTr: String(parsedPart.titleTr ?? `Bolum ${index + 1}: ${part.short}`),
+            descriptionDe: String(parsedPart.descriptionDe ?? part.description),
+            descriptionTr: String(parsedPart.descriptionTr ?? ''),
+            systemPrompt: String(parsedPart.systemPrompt ?? ''),
+            evaluationCriteria: {
+              mode: 'full_exam',
+              examId,
+              caseTitleDe: String(parsed.caseTitleDe ?? 'FSP-Gesamtpruefung'),
+              caseTitleTr: String(parsed.caseTitleTr ?? ''),
+              partOrder: index + 1
+            },
+            checklist: Array.isArray(parsedPart.checklist) ? parsedPart.checklist : [],
+            maxTurns
+          }
+        });
+      }));
+
+      return NextResponse.json({
+        mode: 'full_exam',
+        examId,
+        firstTemplateId: templates[0].id,
+        templates
+      });
+    }
+
+    if (!simulationType) {
+      return NextResponse.json({ error: 'Pruefungsteil ist erforderlich.' }, { status: 400 });
+    }
+
     const prompt = `Du bist ein Experte fuer die deutsche Fachsprachenpruefung fuer internationale Aerztinnen und Aerzte.
 
 Erstelle ein realistisches FSP-Uebungsszenario.

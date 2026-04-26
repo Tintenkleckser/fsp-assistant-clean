@@ -40,7 +40,21 @@ export const SIMULATION_TYPES = [
   }
 ] as const;
 
+export const PRACTICE_MODES = [
+  {
+    id: 'single_part',
+    label: 'Einzelteil ueben',
+    description: 'Gezielt einen Pruefungsteil trainieren: Anamnese, Dokumentation oder Uebergabe.'
+  },
+  {
+    id: 'full_exam',
+    label: 'Gesamte Pruefung',
+    description: 'Ein zusammenhaengender Fall durch alle drei Pruefungsteile in der richtigen Reihenfolge.'
+  }
+] as const;
+
 export type DifficultyId = (typeof DIFFICULTY_LEVELS)[number]['id'];
+export type PracticeModeId = (typeof PRACTICE_MODES)[number]['id'];
 export type SimulationTypeId = (typeof SIMULATION_TYPES)[number]['id'];
 
 export function getDifficulty(id: string) {
@@ -49,4 +63,8 @@ export function getDifficulty(id: string) {
 
 export function getSimulationType(id: string) {
   return SIMULATION_TYPES.find((simulationType) => simulationType.id === id);
+}
+
+export function getPracticeMode(id: string) {
+  return PRACTICE_MODES.find((practiceMode) => practiceMode.id === id);
 }
