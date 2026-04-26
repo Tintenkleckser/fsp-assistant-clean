@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { DIFFICULTY_LEVELS, SIMULATION_TYPES } from '@/lib/topic-categories';
+import { DIFFICULTY_LEVELS, SIMULATION_TYPES, type DifficultyId, type SimulationTypeId } from '@/lib/topic-categories';
 
 type TemplatePreview = {
   id: string;
@@ -15,8 +15,8 @@ type TemplatePreview = {
 
 export function NewSimulationForm({ recentTemplates }: { recentTemplates: TemplatePreview[] }) {
   const router = useRouter();
-  const [simulationType, setSimulationType] = useState(SIMULATION_TYPES[0].id);
-  const [difficulty, setDifficulty] = useState(DIFFICULTY_LEVELS[1].id);
+  const [simulationType, setSimulationType] = useState<SimulationTypeId>(SIMULATION_TYPES[0].id);
+  const [difficulty, setDifficulty] = useState<DifficultyId>(DIFFICULTY_LEVELS[1].id);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
