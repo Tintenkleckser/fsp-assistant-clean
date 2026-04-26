@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { SIMULATION_TYPES } from '@/lib/topic-categories';
+import { StartSimulationButton } from './start-simulation-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,13 +88,7 @@ export default async function BriefingPage({ params }: { params: { templateId: s
             >
               Zurueck zum Dashboard
             </Link>
-            <button
-              type="button"
-              className="rounded-md bg-ink px-5 py-3 text-sm font-semibold text-white opacity-70"
-              disabled
-            >
-              Chat folgt im naechsten Schritt
-            </button>
+            <StartSimulationButton templateId={template.id} />
           </div>
         </section>
       </div>
