@@ -3,6 +3,85 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+
+    return <span key={index}>{part}</span>;
+  });
+}
+
+function MarkdownFeedback({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+
+  function flushList() {
+    if (listItems.length === 0) return;
+
+    elements.push(
+      <ul key={`list-${elements.length}`} className="my-3 list-disc space-y-1 pl-5">
+        {listItems.map((item, index) => (
+          <li key={index}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  }
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushList();
+      elements.push(
+        <h3 key={`heading-${index}`} className="mt-4 font-semibold text-ink">
+          {renderInlineMarkdown(heading[2])}
+        </h3>
+      );
+      return;
+    }
+
+    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (numbered) {
+      flushList();
+      elements.push(
+        <p key={`numbered-${index}`} className="mt-3 font-semibold text-ink">
+          {renderInlineMarkdown(numbered[1])}
+        </p>
+      );
+      return;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      listItems.push(bullet[1]);
+      return;
+    }
+
+    flushList();
+    elements.push(
+      <p key={`paragraph-${index}`} className="mt-2">
+        {renderInlineMarkdown(trimmed)}
+      </p>
+    );
+  });
+
+  flushList();
+
+  return <div className="text-sm leading-7 text-slate-800">{elements}</div>;
+}
+
 export function ProfileClient({
   email,
   initialName,
@@ -65,14 +144,28 @@ export function ProfileClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question })
       });
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json().catch(() => null);
         setCoachError(data?.error ?? 'KI-Coach konnte nicht antworten.');
         return;
       }
 
-      setCoachFeedback(data.feedback ?? '');
+      if (!response.body) {
+        setCoachError('KI-Coach konnte keine Streaming-Antwort senden.');
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        setCoachFeedback((current) => current + chunk);
+      }
     } catch {
       setCoachError('Netzwerkfehler beim KI-Coach.');
     } finally {
@@ -171,8 +264,8 @@ export function ProfileClient({
         ) : null}
 
         {coachFeedback ? (
-          <div className="mt-4 rounded-md bg-mint p-4 text-sm leading-7 text-slate-800 whitespace-pre-wrap">
-            {coachFeedback}
+          <div className="mt-4 rounded-md bg-mint p-4">
+            <MarkdownFeedback content={coachFeedback} />
           </div>
         ) : null}
 

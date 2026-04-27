@@ -71,7 +71,8 @@ Antworte auf Deutsch. Nutze kurze Abschnitte:
         model: 'mistral-large-latest',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 1400,
-        temperature: 0.35
+        temperature: 0.35,
+        stream: true
       })
     });
 
@@ -81,10 +82,62 @@ Antworte auf Deutsch. Nutze kurze Abschnitte:
       return NextResponse.json({ error: 'LLM-API-Fehler beim Lerncoach.' }, { status: 502 });
     }
 
-    const data = await llmResponse.json();
-    const feedback = String(data?.choices?.[0]?.message?.content ?? '').trim();
+    if (!llmResponse.body) {
+      return NextResponse.json({ error: 'Keine Streaming-Antwort vom Lerncoach.' }, { status: 502 });
+    }
 
-    return NextResponse.json({ feedback });
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = llmResponse.body!.getReader();
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+
+              if (!trimmed.startsWith('data:')) continue;
+
+              const payload = trimmed.slice(5).trim();
+
+              if (!payload || payload === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(payload);
+                const content = parsed?.choices?.[0]?.delta?.content;
+
+                if (typeof content === 'string' && content.length > 0) {
+                  controller.enqueue(encoder.encode(content));
+                }
+              } catch {
+                // Ignore malformed stream fragments and continue reading.
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform'
+      }
+    });
   } catch (error) {
     console.error('Profile coach route error:', error);
     return NextResponse.json({ error: 'Lerncoach konnte nicht antworten.' }, { status: 500 });
