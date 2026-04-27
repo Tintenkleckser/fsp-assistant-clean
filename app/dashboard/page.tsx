@@ -40,9 +40,6 @@ export default async function DashboardPage() {
             <p className="text-sm font-semibold text-medical">FSP-Assistent</p>
             <h1 className="mt-1 text-2xl font-bold text-ink">Dashboard</h1>
             <p className="mt-1 text-sm text-slate-600">{user.email}</p>
-            <p className="mt-2 inline-flex rounded bg-mint px-2 py-1 text-xs font-semibold text-ink">
-              Dashboard v3 aktiv · Kacheln sind klickbar
-            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/api/health" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
@@ -59,7 +56,7 @@ export default async function DashboardPage() {
           <Link href="/simulation/new" className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-medical hover:shadow-md">
             <p className="text-sm text-slate-500">Vorlagen</p>
             <p className="mt-2 text-3xl font-bold text-medical">{templates.length}</p>
-            <p className="mt-2 text-xs font-semibold text-ink">Neue Uebung erzeugen</p>
+            <p className="mt-2 text-xs font-semibold text-ink">Neue Übung erzeugen</p>
           </Link>
           <Link href={resumeHref} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-medical hover:shadow-md">
             <p className="text-sm text-slate-500">Aktive Simulationen</p>
@@ -72,11 +69,11 @@ export default async function DashboardPage() {
             <p className="mt-2 text-xs font-semibold text-ink">Verlauf ansehen</p>
           </Link>
           <Link href={resumeHref} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-medical hover:shadow-md">
-            <p className="text-sm text-slate-500">Naechster Schritt</p>
+            <p className="text-sm text-slate-500">Nächster Schritt</p>
             <p className="mt-2 text-sm font-semibold text-ink">
-              {activeSimulations.length > 0 ? 'Uebung fortsetzen' : 'Neue Uebung erzeugen'}
+              {activeSimulations.length > 0 ? 'Übung fortsetzen' : 'Neue Übung erzeugen'}
             </p>
-            <p className="mt-2 text-xs font-semibold text-medical">Oeffnen</p>
+            <p className="mt-2 text-xs font-semibold text-medical">Öffnen</p>
           </Link>
         </section>
 
@@ -85,28 +82,28 @@ export default async function DashboardPage() {
             href="/simulation/new"
             className="inline-flex rounded-md bg-medical px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-700"
           >
-            Neue Uebung starten
+            Neue Übung starten
           </Link>
           {activeSimulations[0] ? (
             <Link
               href={`/simulation/${activeSimulations[0].templateId}/chat?simId=${activeSimulations[0].id}`}
               className="inline-flex rounded-md bg-ink px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700"
             >
-              Letzte Uebung fortsetzen
+              Letzte Übung fortsetzen
             </Link>
           ) : null}
         </div>
 
         <section className="grid gap-4 py-8 md:grid-cols-3">
           {[
-            ['Anamnese', 'Arzt-Patient-Gespraech in Laiensprache'],
+            ['Anamnese', 'Arzt-Patient-Gespräch in Laiensprache'],
             ['Dokumentation', 'Kurznotiz und Aufnahmebericht'],
-            ['Uebergabe', 'Strukturierte Fallvorstellung']
+            ['Übergabe', 'Strukturierte Fallvorstellung']
           ].map(([title, text]) => (
             <Link key={title} href="/simulation/new" className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-medical hover:shadow-md">
               <h2 className="font-semibold text-ink">{title}</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
-              <p className="mt-3 text-xs font-semibold text-medical">Uebung hierzu starten</p>
+              <p className="mt-3 text-xs font-semibold text-medical">Übung hierzu starten</p>
             </Link>
           ))}
         </section>
@@ -114,14 +111,14 @@ export default async function DashboardPage() {
         <section className="grid gap-4 md:grid-cols-[1fr_1fr]">
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-ink">Vorhandene Uebungsvorlagen</h2>
+              <h2 className="font-semibold text-ink">Vorhandene Übungsvorlagen</h2>
               <Link href="/simulation/new" className="text-sm font-semibold text-medical">
                 Neue erzeugen
               </Link>
             </div>
             {templates.length === 0 ? (
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Noch keine Vorlagen gefunden. Starte oben mit der ersten Uebung.
+                Noch keine Vorlagen gefunden. Starte oben mit der ersten Übung.
               </p>
             ) : (
               <ul className="mt-4 space-y-3">
@@ -130,7 +127,7 @@ export default async function DashboardPage() {
                     <Link href={`/simulation/${template.id}/briefing`} className="block">
                       <p className="font-semibold text-ink">{template.titleDe}</p>
                       <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">{template.descriptionDe}</p>
-                      <p className="mt-3 text-xs font-semibold text-medical">Briefing oeffnen</p>
+                      <p className="mt-3 text-xs font-semibold text-medical">Briefing öffnen</p>
                     </Link>
                   </li>
                 ))}
@@ -139,10 +136,10 @@ export default async function DashboardPage() {
           </article>
 
           <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-ink">Letzte Uebungen</h2>
+            <h2 className="font-semibold text-ink">Letzte Übungen</h2>
             {recentSimulations.length === 0 ? (
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Noch keine Simulationen fuer dieses Konto gefunden.
+                Noch keine Simulationen für dieses Konto gefunden.
               </p>
             ) : (
               <ul className="mt-4 space-y-3">
@@ -155,13 +152,13 @@ export default async function DashboardPage() {
                     <li key={simulation.id} className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm">
                       <Link href={href} className="block">
                         <p className="font-semibold text-ink">
-                          {simulation.template?.titleDe ?? 'Uebung'}
+                          {simulation.template?.titleDe ?? 'Übung'}
                         </p>
                         <p className="mt-1 text-slate-600">
                           Status: {simulation.status} · Start: {simulation.startedAt.toLocaleDateString('de-DE')}
                         </p>
                         <p className="mt-3 text-xs font-semibold text-medical">
-                          {simulation.status === 'in_progress' ? 'Fortsetzen' : 'Briefing oeffnen'}
+                          {simulation.status === 'in_progress' ? 'Fortsetzen' : 'Briefing öffnen'}
                         </p>
                       </Link>
                     </li>

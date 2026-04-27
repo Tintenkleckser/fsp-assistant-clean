@@ -19,9 +19,9 @@ export const DIFFICULTY_LEVELS = [
 export const SIMULATION_TYPES = [
   {
     id: 'patient_conversation',
-    label: 'Teil 1: Arzt-Patienten-Gespraech',
+    label: 'Teil 1: Arzt-Patienten-Gespräch',
     short: 'Anamnese',
-    description: 'Anamnesegespraech mit einem Patienten in laienverstaendlicher Sprache.',
+    description: 'Anamnesegespräch mit einem Patienten in laienverständlicher Sprache.',
     timeLimitMin: 20
   },
   {
@@ -33,9 +33,9 @@ export const SIMULATION_TYPES = [
   },
   {
     id: 'doctor_conversation',
-    label: 'Teil 3: Arzt-Arzt-Gespraech',
-    short: 'Uebergabe',
-    description: 'Strukturierte Fallvorstellung an eine aerztliche Kollegin oder einen Kollegen.',
+    label: 'Teil 3: Arzt-Arzt-Gespräch',
+    short: 'Übergabe',
+    description: 'Strukturierte Fallvorstellung an eine ärztliche Kollegin oder einen Kollegen.',
     timeLimitMin: 20
   }
 ] as const;
@@ -43,13 +43,13 @@ export const SIMULATION_TYPES = [
 export const PRACTICE_MODES = [
   {
     id: 'single_part',
-    label: 'Einzelteil ueben',
-    description: 'Gezielt einen Pruefungsteil trainieren: Anamnese, Dokumentation oder Uebergabe.'
+    label: 'Einzelteil üben',
+    description: 'Gezielt einen Prüfungsteil trainieren: Anamnese, Dokumentation oder Übergabe.'
   },
   {
     id: 'full_exam',
-    label: 'Gesamte Pruefung',
-    description: 'Ein zusammenhaengender Fall durch alle drei Pruefungsteile in der richtigen Reihenfolge.'
+    label: 'Gesamte Prüfung',
+    description: 'Ein zusammenhängender Fall durch alle drei Prüfungsteile in der richtigen Reihenfolge.'
   }
 ] as const;
 

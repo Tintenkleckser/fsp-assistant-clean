@@ -59,7 +59,7 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
         <header className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
             <p className="text-sm font-semibold text-medical">FSP-Assistent</p>
-            <h1 className="mt-1 text-2xl font-bold text-ink">Neue Uebung</h1>
+            <h1 className="mt-1 text-2xl font-bold text-ink">Neue Übung</h1>
           </div>
           <Link href="/dashboard" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
             Dashboard
@@ -68,7 +68,7 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
 
         <section className="grid gap-5 py-8 md:grid-cols-[1fr_1fr]">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-ink">1. Uebungsform</h2>
+            <h2 className="font-semibold text-ink">1. Übungsform</h2>
             <div className="mt-4 space-y-3">
               {PRACTICE_MODES.map((item) => (
                 <label
@@ -119,7 +119,7 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
 
           {practiceMode === 'single_part' ? (
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="font-semibold text-ink">3. Pruefungsteil</h2>
+            <h2 className="font-semibold text-ink">3. Prüfungsteil</h2>
             <div className="mt-4 space-y-3">
               {SIMULATION_TYPES.map((item) => (
                 <label
@@ -172,16 +172,16 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
               className="mt-5 w-full rounded-md bg-medical px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
             >
-              {loading ? 'Szenario wird erzeugt...' : practiceMode === 'full_exam' ? 'Gesamtpruefung erzeugen' : 'Uebung erzeugen'}
+              {loading ? 'Szenario wird erzeugt...' : practiceMode === 'full_exam' ? 'Gesamtprüfung erzeugen' : 'Übung erzeugen'}
             </button>
           </div>
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-semibold text-ink">Vorhandene Uebungsvorlagen</h2>
+          <h2 className="font-semibold text-ink">Vorhandene Übungsvorlagen</h2>
           {recentTemplates.length === 0 ? (
             <p className="mt-2 text-sm text-slate-600">
-              Noch keine Vorlagen vorhanden. Erzeuge oben die erste Uebung.
+              Noch keine Vorlagen vorhanden. Erzeuge oben die erste Übung.
             </p>
           ) : (
             <div className="mt-4 grid gap-3 md:grid-cols-2">
