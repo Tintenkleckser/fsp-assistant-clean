@@ -4,6 +4,11 @@ import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+type CoachHistoryItem = {
+  role?: unknown;
+  content?: unknown;
+};
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
@@ -18,6 +23,15 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const question = String(body?.question ?? '').trim();
+    const mode = String(body?.mode ?? 'question');
+    const historyInput: CoachHistoryItem[] = Array.isArray(body?.history) ? body.history : [];
+    const conversationHistory = historyInput
+      .slice(-8)
+      .map((item) => ({
+        role: item?.role === 'assistant' ? 'assistant' : 'user',
+        content: String(item?.content ?? '').slice(0, 1800)
+      }))
+      .filter((item) => item.content.trim());
 
     const simulations = await prisma.userSimulation.findMany({
       where: { userId: user.id },
@@ -49,13 +63,19 @@ Hilf gezielt zu entscheiden, welche Übung als Nächstes sinnvoll ist.
 Berücksichtige die drei Prüfungsteile: Arzt-Patienten-Gespräch, Dokumentation, Arzt-Arzt-Gespräch.
 Berücksichtige außerdem Zeitmanagement, Sprachpräzision, Verständlichkeit, Struktur und Fachsprache.
 
-FRAGE DES USERS:
+AKTUELLE AKTION:
+${mode === 'explain' ? 'Erkläre die letzte Coach-Antwort einfacher und didaktischer.' : mode === 'translate' ? 'Übersetze die letzte Coach-Antwort ins Türkische und bewahre wichtige deutsche Fachbegriffe.' : 'Beantworte die aktuelle Frage des Users.'}
+
+AKTUELLER VERLAUF MIT DEM USER:
+${JSON.stringify(conversationHistory, null, 2)}
+
+AKTUELLE FRAGE DES USERS:
 ${question || 'Bitte gib mir eine Empfehlung, was ich als Nächstes üben soll.'}
 
 BISHERIGE ÜBUNGEN UND AUSWERTUNGEN:
 ${JSON.stringify(history, null, 2)}
 
-Antworte auf Deutsch. Nutze kurze Abschnitte:
+Antworte mit gut lesbarem Markdown. Wenn die Aktion keine reine Übersetzung ist, antworte überwiegend auf Deutsch und nutze Türkisch gezielt als Lernhilfe. Nutze kurze Abschnitte:
 1. Kurzdiagnose
 2. Nächste beste Übung
 3. Konkreter Trainingsplan für die nächsten 30 Minuten

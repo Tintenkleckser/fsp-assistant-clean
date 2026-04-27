@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 
 type Interaction = {
@@ -10,6 +11,82 @@ type Interaction = {
   userInput: string;
   aiResponse: string;
 };
+
+type AssistState = {
+  answer: string;
+  error: string;
+  loading: boolean;
+  question: string;
+  askOpen: boolean;
+};
+
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+
+    return <span key={index}>{part}</span>;
+  });
+}
+
+function MarkdownAnswer({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: ReactNode[] = [];
+  let listItems: string[] = [];
+
+  function flushList() {
+    if (listItems.length === 0) return;
+
+    elements.push(
+      <ul key={`list-${elements.length}`} className="my-3 list-disc space-y-1 pl-5">
+        {listItems.map((item, index) => (
+          <li key={index}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  }
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushList();
+      elements.push(
+        <h3 key={`heading-${index}`} className="mt-3 font-semibold text-ink">
+          {renderInlineMarkdown(heading[2])}
+        </h3>
+      );
+      return;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      listItems.push(bullet[1]);
+      return;
+    }
+
+    flushList();
+    elements.push(
+      <p key={`paragraph-${index}`} className="mt-2">
+        {renderInlineMarkdown(trimmed)}
+      </p>
+    );
+  });
+
+  flushList();
+
+  return <div className="text-sm leading-7 text-slate-800">{elements}</div>;
+}
 
 export function ChatClient({
   simId,
@@ -40,6 +117,7 @@ export function ChatClient({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
+  const [assist, setAssist] = useState<Record<string, AssistState>>({});
   const [elapsedSeconds, setElapsedSeconds] = useState(() => {
     return Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
   });
@@ -52,7 +130,7 @@ export function ChatClient({
     return () => window.clearInterval(timer);
   }, [startedAt]);
 
-  async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = message.trim();
 
@@ -82,6 +160,63 @@ export function ChatClient({
       setMessage(text);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function updateAssist(interactionId: string, update: Partial<AssistState>) {
+    setAssist((current) => ({
+      ...current,
+      [interactionId]: {
+        ...(current[interactionId] ?? {
+          answer: '',
+          error: '',
+          loading: false,
+          question: '',
+          askOpen: false
+        }),
+        ...update
+      }
+    }));
+  }
+
+  async function requestAssist(interaction: Interaction, mode: 'explain' | 'translate' | 'follow_up') {
+    const current = assist[interaction.id];
+    const question = current?.question.trim() ?? '';
+
+    if (mode === 'follow_up' && !question) {
+      updateAssist(interaction.id, { askOpen: true, error: 'Bitte geben Sie eine Nachfrage ein.' });
+      return;
+    }
+
+    updateAssist(interaction.id, { loading: true, error: '', answer: mode === 'follow_up' ? current?.answer ?? '' : '' });
+
+    try {
+      const response = await fetch('/api/simulation/assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          simId,
+          interactionId: interaction.id,
+          mode,
+          question
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        updateAssist(interaction.id, { error: data?.error ?? 'Lernhilfe konnte nicht erstellt werden.' });
+        return;
+      }
+
+      updateAssist(interaction.id, {
+        answer: data.answer ?? '',
+        question: mode === 'follow_up' ? question : current?.question ?? '',
+        askOpen: mode === 'follow_up' ? false : current?.askOpen ?? false
+      });
+    } catch {
+      updateAssist(interaction.id, { error: 'Netzwerkfehler bei der Lernhilfe.' });
+    } finally {
+      updateAssist(interaction.id, { loading: false });
     }
   }
 
@@ -170,6 +305,67 @@ export function ChatClient({
                 </div>
                 <div className="max-w-[85%] rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">
                   <p className="whitespace-pre-wrap">{interaction.aiResponse}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => updateAssist(interaction.id, { askOpen: !assist[interaction.id]?.askOpen, error: '' })}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink"
+                    >
+                      Nachfragen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => requestAssist(interaction, 'explain')}
+                      disabled={assist[interaction.id]?.loading}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Erklären
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => requestAssist(interaction, 'translate')}
+                      disabled={assist[interaction.id]?.loading}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Türkisch
+                    </button>
+                  </div>
+                  {assist[interaction.id]?.askOpen ? (
+                    <div className="mt-3 rounded-md bg-slate-50 p-3">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-slate-700">Nachfrage zur KI-Antwort</span>
+                        <textarea
+                          className="mt-1 min-h-20 w-full resize-y rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-medical"
+                          value={assist[interaction.id]?.question ?? ''}
+                          onChange={(event) => updateAssist(interaction.id, { question: event.target.value })}
+                          placeholder="Was bedeutet dieser Satz? Kannst du mir das einfacher erklären?"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => requestAssist(interaction, 'follow_up')}
+                        disabled={assist[interaction.id]?.loading}
+                        className="mt-2 rounded-md bg-ink px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Nachfrage senden
+                      </button>
+                    </div>
+                  ) : null}
+                  {assist[interaction.id]?.error ? (
+                    <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {assist[interaction.id]?.error}
+                    </div>
+                  ) : null}
+                  {assist[interaction.id]?.loading ? (
+                    <div className="mt-3 rounded-md bg-mint px-3 py-2 text-xs font-semibold text-ink">
+                      Lernhilfe wird erstellt...
+                    </div>
+                  ) : null}
+                  {assist[interaction.id]?.answer ? (
+                    <div className="mt-3 rounded-md bg-mint p-3">
+                      <MarkdownAnswer content={assist[interaction.id]?.answer ?? ''} />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}

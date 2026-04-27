@@ -82,6 +82,11 @@ function MarkdownFeedback({ content }: { content: string }) {
   return <div className="text-sm leading-7 text-slate-800">{elements}</div>;
 }
 
+type CoachMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 export function ProfileClient({
   email,
   initialName,
@@ -98,7 +103,7 @@ export function ProfileClient({
   const [profileError, setProfileError] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   const [question, setQuestion] = useState('');
-  const [coachFeedback, setCoachFeedback] = useState('');
+  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([]);
   const [coachError, setCoachError] = useState('');
   const [coachLoading, setCoachLoading] = useState(false);
 
@@ -132,17 +137,24 @@ export function ProfileClient({
     }
   }
 
-  async function askCoach(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function runCoachRequest(nextQuestion: string, mode: 'question' | 'explain' | 'translate') {
+    const text = nextQuestion.trim() || 'Bitte gib mir eine Empfehlung, was ich als Nächstes üben soll.';
+    const userMessage: CoachMessage = { role: 'user', content: text };
+    const requestHistory = [...coachMessages, userMessage];
+
     setCoachError('');
-    setCoachFeedback('');
     setCoachLoading(true);
+    setCoachMessages(requestHistory);
 
     try {
       const response = await fetch('/api/profile/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question })
+        body: JSON.stringify({
+          question: text,
+          mode,
+          history: coachMessages
+        })
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -157,6 +169,7 @@ export function ProfileClient({
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let assistantText = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -164,7 +177,8 @@ export function ProfileClient({
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        setCoachFeedback((current) => current + chunk);
+        assistantText += chunk;
+        setCoachMessages([...requestHistory, { role: 'assistant', content: assistantText }]);
       }
     } catch {
       setCoachError('Netzwerkfehler beim KI-Coach.');
@@ -172,6 +186,14 @@ export function ProfileClient({
       setCoachLoading(false);
     }
   }
+
+  async function askCoach(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await runCoachRequest(question, 'question');
+    setQuestion('');
+  }
+
+  const lastCoachAnswer = [...coachMessages].reverse().find((item) => item.role === 'assistant')?.content ?? '';
 
   return (
     <section className="grid gap-5 py-8 md:grid-cols-[0.9fr_1.1fr]">
@@ -263,9 +285,43 @@ export function ProfileClient({
           </div>
         ) : null}
 
-        {coachFeedback ? (
-          <div className="mt-4 rounded-md bg-mint p-4">
-            <MarkdownFeedback content={coachFeedback} />
+        {coachMessages.length > 0 ? (
+          <div className="mt-4 space-y-3">
+            {coachMessages.map((item, index) => (
+              <div
+                key={index}
+                className={item.role === 'user'
+                  ? 'ml-auto max-w-[85%] rounded-md bg-medical px-4 py-3 text-sm leading-6 text-white'
+                  : 'rounded-md bg-mint p-4'}
+              >
+                {item.role === 'user' ? (
+                  <p className="whitespace-pre-wrap">{item.content}</p>
+                ) : (
+                  <MarkdownFeedback content={item.content} />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {lastCoachAnswer ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => runCoachRequest('Bitte erkläre deine letzte Antwort einfacher und mit Beispielen.', 'explain')}
+              disabled={coachLoading}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Letzte Antwort erklären
+            </button>
+            <button
+              type="button"
+              onClick={() => runCoachRequest('Bitte übersetze deine letzte Antwort ins Türkische und markiere wichtige deutsche Fachbegriffe.', 'translate')}
+              disabled={coachLoading}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Türkisch übersetzen
+            </button>
           </div>
         ) : null}
 
