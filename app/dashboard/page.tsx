@@ -42,6 +42,9 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-slate-600">{user.email}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link href="/profile" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
+              Profil
+            </Link>
             <Link href="/api/health" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
               Health
             </Link>
