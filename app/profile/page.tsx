@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { createClient } from '@/lib/supabase/server';
+import { prisma } from '@/lib/db';
 import { ProfileClient } from './profile-client';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,21 @@ export default async function ProfilePage() {
     data: { user: authUser }
   } = await supabase.auth.getUser();
   const metadata = authUser?.user_metadata ?? {};
+  const [profile, regions] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { id: user.id },
+      select: { targetRegionId: true }
+    }),
+    prisma.fspRegion.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        summary: true,
+        verificationStatus: true
+      }
+    }).catch(() => [])
+  ]);
 
   return (
     <main className="min-h-screen px-5 py-8">
@@ -37,6 +53,8 @@ export default async function ProfilePage() {
           email={user.email}
           initialName={typeof metadata.full_name === 'string' ? metadata.full_name : ''}
           initialAvatarUrl={typeof metadata.avatar_url === 'string' ? metadata.avatar_url : ''}
+          initialTargetRegionId={profile?.targetRegionId ?? ''}
+          regions={regions}
         />
       </div>
     </main>

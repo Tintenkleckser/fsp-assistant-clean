@@ -8,8 +8,7 @@ import {
   PRACTICE_MODES,
   SIMULATION_TYPES,
   type DifficultyId,
-  type PracticeModeId,
-  type SimulationTypeId
+  type PracticeModeId
 } from '@/lib/topic-categories';
 
 type TemplatePreview = {
@@ -20,13 +19,61 @@ type TemplatePreview = {
   difficulty: string;
 };
 
-export function NewSimulationForm({ recentTemplates }: { recentTemplates: TemplatePreview[] }) {
+type RegionExamPart = {
+  partKey: string;
+  title: string;
+  durationMinutes: number | null;
+  sequenceOrder: number;
+  languageFocus: string[];
+  requiredOutput: string | null;
+  isCorePart: boolean;
+  trainingImpact: string | null;
+};
+
+type RegionRequirement = {
+  partKey: string | null;
+  requirementType: string;
+  title: string;
+  trainingImpact: string;
+  severity: string;
+};
+
+type RegionContext = {
+  id: string;
+  name: string;
+  summary: string | null;
+  verificationStatus: string;
+  examParts: RegionExamPart[];
+  requirements: RegionRequirement[];
+};
+
+const fallbackParts: RegionExamPart[] = SIMULATION_TYPES.map((item, index) => ({
+  partKey: item.id,
+  title: item.label,
+  durationMinutes: item.timeLimitMin,
+  sequenceOrder: index + 1,
+  languageFocus: [],
+  requiredOutput: item.description,
+  isCorePart: true,
+  trainingImpact: item.description
+}));
+
+export function NewSimulationForm({
+  recentTemplates,
+  region
+}: {
+  recentTemplates: TemplatePreview[];
+  region: RegionContext | null;
+}) {
   const router = useRouter();
   const [practiceMode, setPracticeMode] = useState<PracticeModeId>(PRACTICE_MODES[0].id);
-  const [simulationType, setSimulationType] = useState<SimulationTypeId>(SIMULATION_TYPES[0].id);
+  const regionalCoreParts = region?.examParts.filter((part) => part.isCorePart) ?? [];
+  const availableParts = regionalCoreParts.length > 0 ? regionalCoreParts : fallbackParts;
+  const [selectedPartKey, setSelectedPartKey] = useState(availableParts[0]?.partKey ?? 'patient_conversation');
   const [difficulty, setDifficulty] = useState<DifficultyId>(DIFFICULTY_LEVELS[1].id);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const criticalRequirements = region?.requirements.filter((item) => item.severity === 'critical') ?? [];
 
   async function generateSimulation() {
     setLoading(true);
@@ -36,7 +83,13 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
       const response = await fetch('/api/simulation/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ practiceMode, simulationType, difficulty })
+        body: JSON.stringify({
+          practiceMode,
+          simulationType: selectedPartKey,
+          difficulty,
+          regionId: region?.id ?? null,
+          partKey: selectedPartKey
+        })
       });
       const data = await response.json();
 
@@ -65,6 +118,32 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
             Dashboard
           </Link>
         </header>
+
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-medical">Ziel-Bundesland</p>
+              <h2 className="mt-1 text-xl font-bold text-ink">{region?.name ?? 'Noch nicht gewählt'}</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                {region?.summary ?? 'Bitte wählen Sie zuerst im Profil ein Bundesland, damit Prüfungsteile, Zeitlimits und Besonderheiten regional gesteuert werden können.'}
+              </p>
+            </div>
+            <Link href="/profile" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
+              Bundesland ändern
+            </Link>
+          </div>
+          {criticalRequirements.length > 0 ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {criticalRequirements.map((requirement) => (
+                <div key={`${requirement.requirementType}-${requirement.title}`} className="rounded-md border border-red-100 bg-red-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{requirement.requirementType}</p>
+                  <p className="mt-1 text-sm font-semibold text-ink">{requirement.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-700">{requirement.trainingImpact}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
 
         <section className="grid gap-5 py-8 md:grid-cols-[1fr_1fr]">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -121,25 +200,27 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="font-semibold text-ink">3. Prüfungsteil</h2>
             <div className="mt-4 space-y-3">
-              {SIMULATION_TYPES.map((item) => (
+              {availableParts.map((item) => (
                 <label
-                  key={item.id}
+                  key={item.partKey}
                   className={`block cursor-pointer rounded-md border p-4 ${
-                    simulationType === item.id ? 'border-medical bg-mint' : 'border-slate-200 bg-white'
+                    selectedPartKey === item.partKey ? 'border-medical bg-mint' : 'border-slate-200 bg-white'
                   }`}
                 >
                   <input
                     className="sr-only"
                     type="radio"
                     name="simulationType"
-                    value={item.id}
-                    checked={simulationType === item.id}
-                    onChange={() => setSimulationType(item.id)}
+                    value={item.partKey}
+                    checked={selectedPartKey === item.partKey}
+                    onChange={() => setSelectedPartKey(item.partKey)}
                   />
-                  <span className="font-semibold text-ink">{item.label}</span>
-                  <span className="mt-1 block text-sm leading-6 text-slate-600">{item.description}</span>
+                  <span className="font-semibold text-ink">{item.title}</span>
+                  <span className="mt-1 block text-sm leading-6 text-slate-600">
+                    {item.requiredOutput ?? item.trainingImpact ?? 'Regionaler Prüfungsteil'}
+                  </span>
                   <span className="mt-2 inline-block rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
-                    {item.timeLimitMin} Minuten
+                    {item.durationMinutes ?? 20} Minuten
                   </span>
                 </label>
               ))}
@@ -149,10 +230,13 @@ export function NewSimulationForm({ recentTemplates }: { recentTemplates: Templa
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="font-semibold text-ink">3. Fallkette</h2>
             <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-              {SIMULATION_TYPES.map((item, index) => (
-                <li key={item.id} className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <span className="font-semibold text-ink">Teil {index + 1}: {item.short}</span>
-                  <span className="mt-1 block">{item.description}</span>
+              {availableParts.map((item, index) => (
+                <li key={item.partKey} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <span className="font-semibold text-ink">Teil {index + 1}: {item.title}</span>
+                  <span className="mt-1 block">{item.trainingImpact ?? item.requiredOutput}</span>
+                  <span className="mt-2 inline-block rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                    {item.durationMinutes ?? 20} Minuten
+                  </span>
                 </li>
               ))}
             </ol>

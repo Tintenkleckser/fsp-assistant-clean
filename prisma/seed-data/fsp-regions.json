@@ -1,0 +1,321 @@
+{
+  "version": 1,
+  "lastCuratedAt": "2026-05-05",
+  "regions": [
+    {
+      "id": "bayern",
+      "name": "Bayern",
+      "authorityName": "Bayerische Landesärztekammer",
+      "examProvider": "Bayerische Landesärztekammer",
+      "summary": "Der Sprachtest ist als Einzelprüfung angelegt und umfasst Arzt-Patienten-Gespräch, ein übliches ärztliches Schriftstück und ein Gespräch mit einem anderen Arzt. Die Quelle beschreibt die Bereiche regelungsnah; konkrete Detailabläufe sollten vor produktivem Training nochmals geprüft werden.",
+      "verificationStatus": "source_checked_needs_detail_review",
+      "lastVerifiedAt": "2026-05-05",
+      "sources": [
+        {
+          "id": "bayern-blaek-fsp",
+          "title": "Fachsprachenprüfung",
+          "publisher": "Bayerische Landesärztekammer",
+          "url": "https://www.blaek.de/wegweiser/fachsprachenpruefung",
+          "sourceType": "official",
+          "notes": "Beschreibt Art und Gliederung des Sprachtests, darunter Arzt-Patienten-Gespräch, ärztliches Schriftstück und Arzt-Arzt-Gespräch."
+        }
+      ],
+      "examParts": [
+        {
+          "partKey": "patient_interview",
+          "title": "Simuliertes Arzt-Patienten-Gespräch",
+          "durationMinutes": null,
+          "sequenceOrder": 1,
+          "setting": "Einzelprüfung mit simulierter Kommunikation zwischen Arzt und Patient.",
+          "languageFocus": ["Hörverstehen", "mündlicher Ausdruck", "patientengerechte Kommunikation"],
+          "requiredOutput": "Strukturiertes Anamnesegespräch mit patientengerechter Erklärung.",
+          "trainingImpact": "Patientenrolle soll auf unklare Fachsprache, fehlende Struktur und unvollständige Anamnese reagieren.",
+          "verificationStatus": "source_checked_needs_detail_review",
+          "sourceRefs": ["bayern-blaek-fsp"]
+        },
+        {
+          "partKey": "documentation",
+          "title": "Ärztliches Schriftstück",
+          "durationMinutes": null,
+          "sequenceOrder": 2,
+          "setting": "Anfertigen eines in der ärztlichen Berufsausübung üblichen Schriftstücks, zum Beispiel Kurz-Arztbrief.",
+          "languageFocus": ["schriftlicher Ausdruck", "medizinische Fachsprache", "Struktur"],
+          "requiredOutput": "Kurz-Arztbrief oder vergleichbares ärztliches Schriftstück.",
+          "trainingImpact": "Dokumentationsmodus muss strukturierte medizinische Schriftlichkeit trainieren, nicht nur freie Chat-Antworten.",
+          "verificationStatus": "source_checked_needs_detail_review",
+          "sourceRefs": ["bayern-blaek-fsp"]
+        },
+        {
+          "partKey": "doctor_conversation",
+          "title": "Gespräch mit einem anderen Arzt",
+          "durationMinutes": null,
+          "sequenceOrder": 3,
+          "setting": "Fachlicher Austausch mit einer ärztlichen Kollegin oder einem ärztlichen Kollegen.",
+          "languageFocus": ["Fachsprache", "strukturierte Fallvorstellung", "kollegiale Kommunikation"],
+          "requiredOutput": "Mündliche Fallvorstellung und Beantwortung fachsprachlicher Rückfragen.",
+          "trainingImpact": "Gegenrolle soll fachsprachlich nachfragen und strukturierte Übergabe erzwingen.",
+          "verificationStatus": "source_checked_needs_detail_review",
+          "sourceRefs": ["bayern-blaek-fsp"]
+        }
+      ],
+      "requirements": [
+        {
+          "partKey": null,
+          "requirementType": "timing",
+          "title": "Zeitlimit strikt einhalten",
+          "description": "Die Prüfung ist zeitkritisch. Antworten müssen nicht nur inhaltlich korrekt, sondern innerhalb des jeweiligen Prüfungsteils abgeschlossen sein.",
+          "trainingImpact": "Jede Bayern-Simulation soll mit sichtbarem Countdown, Zeitwarnung und strenger Zeitmanagement-Bewertung laufen.",
+          "severity": "critical",
+          "examples": ["Countdown pro Prüfungsteil", "Warnung bei drei Minuten Restzeit", "deutliche Abwertung bei Überschreitung"],
+          "evaluationHints": ["Zeitüberschreitung immer explizit markieren", "Zeitmanagement bei Überschreitung deckeln", "Feedback mit Kürzungsstrategie geben"],
+          "promptDirectives": ["Halte Rollenantworten knapp genug, damit der Kandidat im Zeitlimit weiterarbeiten kann."],
+          "verificationStatus": "source_checked_needs_detail_review",
+          "sourceRefs": ["bayern-blaek-fsp"]
+        },
+        {
+          "partKey": "documentation",
+          "requirementType": "documentation",
+          "title": "Kurz-Arztbrief als Trainingsziel",
+          "description": "Die bayerische Quelle nennt als Beispiel ein übliches ärztliches Schriftstück, etwa einen Kurz-Arztbrief an einen Berufskollegen.",
+          "trainingImpact": "Die App sollte für Bayern mindestens eine Kurz-Arztbrief-Variante mit festen Feldern und Bewertung anbieten.",
+          "severity": "critical",
+          "examples": ["Aufnahmegrund", "Anamnese", "Befund", "Verdachtsdiagnose", "Procedere"],
+          "evaluationHints": ["Prüfe Vollständigkeit", "Prüfe fachsprachliche Präzision", "Prüfe logische Reihenfolge"],
+          "promptDirectives": ["Erzeuge Dokumentationsaufgaben als ärztliches Schriftstück mit klarer Adressatenrolle."],
+          "verificationStatus": "source_checked_needs_detail_review",
+          "sourceRefs": ["bayern-blaek-fsp"]
+        }
+      ]
+    },
+    {
+      "id": "sachsen",
+      "name": "Sachsen",
+      "authorityName": "Sächsische Landesärztekammer",
+      "examProvider": "Sächsische Landesärztekammer",
+      "summary": "Die Prüfung ist praxisnah, als Einzelprüfung angelegt und gliedert sich in drei Teile mit jeweils ca. 20 Minuten. Zu Beginn kann eine kurze persönliche Vorstellung verlangt werden. Das Ergebnis wird nach der Prüfung mitgeteilt.",
+      "verificationStatus": "source_checked",
+      "lastVerifiedAt": "2026-05-05",
+      "sources": [
+        {
+          "id": "sachsen-slaek-fsp",
+          "title": "Fachsprachenprüfung",
+          "publisher": "Sächsische Landesärztekammer",
+          "url": "https://www.slaek.de/de/arzt/auslaendische-aerzte/fachsprachenpruefung.php",
+          "sourceType": "official",
+          "notes": "Beschreibt Ablauf, Prüfungskommission, drei Prüfungsteile, Bewertungshinweise und Wiederholbarkeit."
+        }
+      ],
+      "examParts": [
+        {
+          "partKey": "intro_self_presentation",
+          "title": "Kurze persönliche Vorstellung",
+          "durationMinutes": null,
+          "sequenceOrder": 0,
+          "setting": "Zu Beginn stellt sich die Prüfungskommission vor und bittet den Kandidaten, sich kurz vorzustellen.",
+          "languageFocus": ["spontanes Sprechen", "beruflicher Werdegang", "Zielklarheit"],
+          "requiredOutput": "Kurze strukturierte Vorstellung der eigenen Person, des bisherigen Werdegangs und der beruflichen Ziele.",
+          "isCorePart": false,
+          "trainingImpact": "Sachsen-Training sollte eine kurze Warm-up-Aufgabe für Selbstvorstellung enthalten.",
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["sachsen-slaek-fsp"]
+        },
+        {
+          "partKey": "patient_interview",
+          "title": "Arzt-Patienten-Gespräch",
+          "durationMinutes": 20,
+          "sequenceOrder": 1,
+          "setting": "Anamnesegespräch mit einem Patienten, dessen Rolle ein Mitglied der Prüfungskommission übernimmt.",
+          "languageFocus": ["Anamnese", "Verdachtsdiagnosen erklären", "Untersuchungs- und Behandlungsvorschläge", "medizinisches Vokabular"],
+          "requiredOutput": "Anamnese mit Verdachts- und Differentialdiagnosen sowie Vorschlägen zur Diagnostik und Therapie.",
+          "trainingImpact": "Patientensimulation soll Informationen gestaffelt geben und Rückfragen zu Verdachtsdiagnosen, Diagnostik und Therapie auslösen.",
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["sachsen-slaek-fsp"]
+        },
+        {
+          "partKey": "documentation",
+          "title": "Schriftliche Kommunikation",
+          "durationMinutes": 20,
+          "sequenceOrder": 2,
+          "setting": "Schriftlicher Teil auf Grundlage der erhobenen Informationen.",
+          "languageFocus": ["schriftliche Fachsprache", "Struktur", "korrekte Wiedergabe"],
+          "requiredOutput": "Strukturierte medizinische Dokumentation.",
+          "trainingImpact": "Dokumentationsmodus soll die korrekte, knappe und fachsprachliche Wiedergabe des Patientenfalls bewerten.",
+          "verificationStatus": "source_checked_needs_detail_review",
+          "sourceRefs": ["sachsen-slaek-fsp"]
+        },
+        {
+          "partKey": "doctor_conversation",
+          "title": "Arzt-Arzt-Gespräch",
+          "durationMinutes": 20,
+          "sequenceOrder": 3,
+          "setting": "Fachlicher Austausch im Prüfungsausschuss.",
+          "languageFocus": ["Fachsprache", "Fallvorstellung", "Rückfragen beantworten"],
+          "requiredOutput": "Strukturierte fachsprachliche Darstellung und Beantwortung medizinischer Rückfragen.",
+          "trainingImpact": "Arzt-Arzt-Modus soll klare Fallstruktur und belastbare fachsprachliche Antworten verlangen.",
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["sachsen-slaek-fsp"]
+        }
+      ],
+      "requirements": [
+        {
+          "partKey": null,
+          "requirementType": "timing",
+          "title": "Drei Prüfungsteile mit jeweils ca. 20 Minuten trainieren",
+          "description": "Die sächsische Quelle nennt drei Teile mit jeweils ca. 20 Minuten Dauer. Zeitüberschreitungen sind daher als kritischer Trainingsfehler zu behandeln.",
+          "trainingImpact": "Sachsen-Training soll jeden Kernteil mit 20-Minuten-Countdown, automatischer Sperre nach Ablauf und strenger Zeitbewertung durchführen.",
+          "severity": "critical",
+          "examples": ["20 Minuten Anamnese", "20 Minuten Dokumentation", "20 Minuten Arzt-Arzt-Gespräch"],
+          "evaluationHints": ["Prüfe, ob der Kandidat im Zeitfenster abgeschlossen hat", "Bewerte Struktur und Kürze", "Gib eine 3-Minuten-Rettungsstrategie"],
+          "promptDirectives": ["Simuliere realistischen Zeitdruck und vermeide unnötig lange Gegenrollen-Antworten."],
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["sachsen-slaek-fsp"]
+        },
+        {
+          "partKey": "intro_self_presentation",
+          "requirementType": "formal",
+          "title": "Selbstvorstellung zu Beginn vorbereiten",
+          "description": "Die Prüfung beginnt laut Quelle mit Vorstellung der Kommission und einer kurzen Vorstellung des Kandidaten mit bisherigem Werdegang und weiteren Zielen.",
+          "trainingImpact": "Die App sollte vor der Simulation eine 60- bis 90-Sekunden-Selbstvorstellung trainieren und als Sachsen-Besonderheit markieren.",
+          "severity": "important",
+          "examples": ["Name und Herkunft", "Studium und Berufserfahrung", "Fachliches Ziel in Deutschland"],
+          "evaluationHints": ["Prüfe klare Chronologie", "Prüfe sichere Vergangenheitsformen", "Prüfe professionelle Kürze"],
+          "promptDirectives": ["Starte Sachsen-Gesamtprüfungen mit einer kurzen Selbstvorstellungsaufforderung."],
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["sachsen-slaek-fsp"]
+        },
+        {
+          "partKey": "patient_interview",
+          "requirementType": "communication",
+          "title": "Verdachts- und Differentialdiagnosen mit Patient besprechen",
+          "description": "Die Quelle nennt, dass Verdachts- und Differentialdiagnosen, diagnostische Maßnahmen und Therapien besprochen werden.",
+          "trainingImpact": "Die Patientenrolle sollte aktiv nach Diagnose, Untersuchungen und Therapie fragen; Bewertung prüft verständliche Erklärung und Gesprächssteuerung.",
+          "severity": "critical",
+          "examples": ["Was vermuten Sie, was ich habe?", "Welche Untersuchungen brauchen wir?", "Was passiert danach?"],
+          "evaluationHints": ["Prüfe patientengerechte Erklärung", "Prüfe Umgang mit Unsicherheit", "Prüfe sinnvolle Reihenfolge"],
+          "promptDirectives": ["Lasse die Patientenrolle bei unklarer Erklärung nachfragen."],
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["sachsen-slaek-fsp"]
+        }
+      ]
+    },
+    {
+      "id": "berlin",
+      "name": "Berlin",
+      "authorityName": "Ärztekammer Berlin",
+      "examProvider": "Ärztekammer Berlin",
+      "summary": "Die Prüfung besteht aus drei Teilen von jeweils 20 Minuten: Simulationsanamnese, schriftliche Dokumentation und ärztliches Gespräch. Berlin nennt zusätzlich fachsprachliche Mikroleistungen im ärztlichen Gespräch, darunter Fachbegriffe übersetzen, Abkürzungen vervollständigen und Laborwerte korrekt vorlesen.",
+      "verificationStatus": "source_checked",
+      "lastVerifiedAt": "2026-05-05",
+      "sources": [
+        {
+          "id": "berlin-aekb-fsp",
+          "title": "Fachsprachprüfung",
+          "publisher": "Ärztekammer Berlin",
+          "url": "https://www.aekb.de/10arzt/61_Fachsprachpruefung/index.html",
+          "sourceType": "official",
+          "notes": "Beschreibt drei Prüfungsteile, Bewertung, Bestehensgrenze und Detailanforderungen im ärztlichen Gespräch."
+        },
+        {
+          "id": "berlin-lageso-hinweise",
+          "title": "Hinweise zum Fachsprachentest für Ärztinnen/Ärzte",
+          "publisher": "Landesamt für Gesundheit und Soziales Berlin",
+          "url": "https://www.berlin.de/lageso/_assets/gesundheit/berufe-im-gesundheitswesen/akademisch/aerztin-arzt/information_fachsprachentest_arzt.pdf",
+          "sourceType": "official_pdf",
+          "notes": "Ergänzende Hinweise zu Anmeldung, Ort, Ablauf und Anforderungen."
+        }
+      ],
+      "examParts": [
+        {
+          "partKey": "patient_interview",
+          "title": "Simulationsanamnese",
+          "durationMinutes": 20,
+          "sequenceOrder": 1,
+          "setting": "Simuliertes Arzt-Patienten-Gespräch in einer alltagsnahen Gesprächssituation.",
+          "languageFocus": ["Anamnese", "Laiensprache", "Hörverstehen", "Empathie"],
+          "requiredOutput": "Patientengespräch mit persönlichen Angaben, aktuellen Beschwerden, Vorerkrankungen, Medikamenten- und Familienanamnese.",
+          "trainingImpact": "Berlin-Training soll vollständige Anamnesestruktur, Verzicht auf unnötige Fachbegriffe und gute Reaktion auf Rückfragen bewerten.",
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["berlin-aekb-fsp", "berlin-lageso-hinweise"]
+        },
+        {
+          "partKey": "documentation",
+          "title": "Schriftliche Dokumentation der Simulationsanamnese",
+          "durationMinutes": 20,
+          "sequenceOrder": 2,
+          "setting": "Schriftliche Dokumentation auf Grundlage der Simulationsanamnese.",
+          "languageFocus": ["Schreiben", "Struktur", "medizinische Fachsprache"],
+          "requiredOutput": "Strukturierte schriftliche Wiedergabe des Falls.",
+          "trainingImpact": "Dokumentationsmodus soll aus dem Gespräch automatisch einen Erwartungshorizont ableiten und fehlende Angaben markieren.",
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["berlin-aekb-fsp", "berlin-lageso-hinweise"]
+        },
+        {
+          "partKey": "doctor_conversation",
+          "title": "Ärztliches Gespräch",
+          "durationMinutes": 20,
+          "sequenceOrder": 3,
+          "setting": "Patientenvorstellung und fachlicher Austausch mit Prüferinnen oder Prüfern.",
+          "languageFocus": ["Fachsprache", "Fallvorstellung", "medizinische Terminologie", "Zahlen und Einheiten"],
+          "requiredOutput": "Patient vorstellen, Rückfragen beantworten, Fachbegriffe übersetzen, Abkürzungen vervollständigen und Laborwerte korrekt vorlesen.",
+          "trainingImpact": "Berlin braucht zusätzlich einen Terminologie-, Abkürzungs- und Laborwerte-Drill im Arzt-Arzt-Modus.",
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["berlin-aekb-fsp"]
+        }
+      ],
+      "requirements": [
+        {
+          "partKey": null,
+          "requirementType": "timing",
+          "title": "Drei Prüfungsteile mit jeweils 20 Minuten strikt einhalten",
+          "description": "Berlin beschreibt die drei Prüfungsteile mit jeweils 20 Minuten. Das Training muss deshalb unter strengem Countdown stattfinden.",
+          "trainingImpact": "Berlin-Training soll nach Ablauf keine weiteren Antworten werten und Zeitüberschreitungen im Feedback deutlich bestrafen.",
+          "severity": "critical",
+          "examples": ["20 Minuten Simulationsanamnese", "20 Minuten Dokumentation", "20 Minuten ärztliches Gespräch"],
+          "evaluationHints": ["Zeitmanagement ist ein eigener Score", "Bei Überschreitung Score deckeln", "Feedback muss konkrete Kürzungs- und Priorisierungsstrategie enthalten"],
+          "promptDirectives": ["Baue Aufgaben so, dass sie in 20 Minuten realistisch lösbar sind, aber Zeitdruck erzeugen."],
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["berlin-aekb-fsp", "berlin-lageso-hinweise"]
+        },
+        {
+          "partKey": "doctor_conversation",
+          "requirementType": "terminology",
+          "title": "Fachbegriffe ins Deutsche übersetzen",
+          "description": "Die Berliner Quelle nennt im ärztlichen Gespräch die Übersetzung von fünf medizinischen Fachbegriffen ins Deutsche.",
+          "trainingImpact": "Die App sollte für Berlin einen kurzen Fachbegriffsblock nach der Fallvorstellung einbauen.",
+          "severity": "critical",
+          "examples": ["Cephalgie -> Kopfschmerzen", "Dyspnoe -> Atemnot"],
+          "evaluationHints": ["Prüfe korrekte laienverständliche Entsprechung", "Prüfe Aussprache oder Schreibweise, falls Audio verfügbar ist"],
+          "promptDirectives": ["Füge im Berliner Arzt-Arzt-Gespräch fünf Fachbegriffsfragen hinzu."],
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["berlin-aekb-fsp"]
+        },
+        {
+          "partKey": "doctor_conversation",
+          "requirementType": "abbreviations",
+          "title": "Medizinische Abkürzungen vervollständigen",
+          "description": "Die Berliner Quelle nennt zwei medizinische Abkürzungen, die im ärztlichen Gespräch vervollständigt werden.",
+          "trainingImpact": "Die App sollte einen kleinen Abkürzungsdrill in Berliner Gesamtprüfungen anbieten.",
+          "severity": "important",
+          "examples": ["RR", "CT", "EKG"],
+          "evaluationHints": ["Prüfe ausgeschriebene Form", "Prüfe Kontextverständnis"],
+          "promptDirectives": ["Füge zwei Abkürzungsfragen nach der Fallvorstellung hinzu."],
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["berlin-aekb-fsp"]
+        },
+        {
+          "partKey": "doctor_conversation",
+          "requirementType": "lab_values",
+          "title": "Laborwerte mit Zahlen und Maßeinheiten korrekt vorlesen",
+          "description": "Berlin nennt drei Laborwerte mit Zahlen und Maßeinheiten als Bestandteil des ärztlichen Gesprächs.",
+          "trainingImpact": "Die App sollte Laborwertkarten mit Zahlen, Einheiten und Aussprachetraining erzeugen.",
+          "severity": "critical",
+          "examples": ["CRP 85 mg/l", "Leukozyten 14,2 /nl", "Hb 10,8 g/dl"],
+          "evaluationHints": ["Prüfe Zahlverständnis", "Prüfe Einheit", "Prüfe medizinisch plausible Lesung"],
+          "promptDirectives": ["Füge drei Laborwert-Leseaufgaben in Berliner Arzt-Arzt-Simulationen hinzu."],
+          "verificationStatus": "source_checked",
+          "sourceRefs": ["berlin-aekb-fsp"]
+        }
+      ]
+    }
+  ]
+}

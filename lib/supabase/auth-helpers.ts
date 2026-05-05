@@ -29,6 +29,7 @@ export async function getAuthUser() {
   return {
     id: user.id,
     email: user.email ?? profile.email,
-    nativeLanguage: profile.nativeLanguage
+    nativeLanguage: profile.nativeLanguage,
+    targetRegionId: profile.targetRegionId
   };
 }

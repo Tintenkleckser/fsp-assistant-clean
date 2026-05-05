@@ -96,6 +96,7 @@ export function ChatClient({
   description,
   descriptionTr,
   maxTurns,
+  timeLimitMinutes,
   languageMode,
   startedAt,
   initialInteractions
@@ -107,6 +108,7 @@ export function ChatClient({
   description: string;
   descriptionTr: string;
   maxTurns: number;
+  timeLimitMinutes: number;
   languageMode: string;
   startedAt: string;
   initialInteractions: Interaction[];
@@ -135,6 +137,10 @@ export function ChatClient({
     const text = message.trim();
 
     if (!text) return;
+    if (isTimeExpired) {
+      setError('Die Prüfungszeit ist abgelaufen. Bitte beenden Sie die Simulation und lassen Sie sie auswerten.');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -246,11 +252,24 @@ export function ChatClient({
   }
 
   const remainingTurns = Math.max(maxTurns - interactions.length, 0);
-  const timeLimitSeconds = 20 * 60;
+  const timeLimitSeconds = Math.max(1, timeLimitMinutes) * 60;
   const remainingSeconds = Math.max(timeLimitSeconds - elapsedSeconds, 0);
+  const overtimeSeconds = Math.max(elapsedSeconds - timeLimitSeconds, 0);
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
   const timeCritical = remainingSeconds <= 180;
+  const isTimeExpired = overtimeSeconds > 0;
+  const overtimeMinutes = Math.floor(overtimeSeconds / 60);
+  const overtimeRemainderSeconds = overtimeSeconds % 60;
+  const modeLabel = languageMode === 'turkish_practice'
+    ? 'Türkischer Lernmodus'
+    : languageMode === 'bilingual'
+      ? 'Deutsch + Türkisch'
+      : 'Prüfungsmodus';
+  const answerLabel = languageMode === 'turkish_practice' ? 'Ihre Antwort auf Türkisch' : 'Ihre Antwort';
+  const answerPlaceholder = languageMode === 'turkish_practice'
+    ? 'Türkçe cevap yazın. Uygulama bunu Almanca sınav cümlelerine dönüştürür...'
+    : 'Schreiben Sie Ihre Antwort auf Deutsch...';
 
   return (
     <main className="min-h-screen px-5 py-8">
@@ -262,10 +281,12 @@ export function ChatClient({
             <p className="mt-1 text-sm text-slate-600">{titleTr}</p>
             <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
               <span className="rounded bg-mint px-2 py-1 text-ink">
-                {languageMode === 'bilingual' ? 'Deutsch + Tuerkisch' : 'Pruefungsmodus'}
+                {modeLabel}
               </span>
               <span className={`rounded px-2 py-1 ${timeCritical ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-ink'}`}>
-                Zeit: {minutes}:{seconds.toString().padStart(2, '0')}
+                {isTimeExpired
+                  ? `Zeit ueberschritten: +${overtimeMinutes}:${overtimeRemainderSeconds.toString().padStart(2, '0')}`
+                  : `Zeit: ${minutes}:${seconds.toString().padStart(2, '0')}`}
               </span>
               <span className="rounded bg-slate-100 px-2 py-1 text-ink">
                 {remainingTurns} Antworten empfohlen
@@ -288,6 +309,11 @@ export function ChatClient({
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {descriptionTr || 'Nutzen Sie Deutsch fuer die eigentliche Pruefungsantwort. Die tuerkische Hilfe dient der Orientierung.'}
               </p>
+              {languageMode === 'turkish_practice' ? (
+                <p className="mt-3 rounded bg-white px-3 py-2 text-xs font-semibold leading-5 text-ink">
+                  Türkischer Lernmodus: Sie dürfen auf Türkisch arbeiten. Bewertet wird zusätzlich, wie gut daraus eine knappe deutsche Prüfungsantwort entstehen kann.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -377,14 +403,19 @@ export function ChatClient({
                 {error}
               </div>
             ) : null}
+            {isTimeExpired ? (
+              <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                Zeitlimit erreicht. Weitere Antworten werden nicht mehr gewertet.
+              </div>
+            ) : null}
             <label className="block">
-              <span className="text-sm font-semibold text-ink">Ihre Antwort</span>
+              <span className="text-sm font-semibold text-ink">{answerLabel}</span>
               <textarea
                 className="mt-2 min-h-28 w-full resize-y rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-medical"
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                placeholder="Schreiben Sie Ihre Antwort auf Deutsch..."
-                disabled={loading}
+                placeholder={answerPlaceholder}
+                disabled={loading || isTimeExpired}
               />
             </label>
             <div className="mt-3 flex flex-wrap justify-between gap-3">
@@ -403,7 +434,7 @@ export function ChatClient({
               </div>
               <button
                 type="submit"
-                disabled={loading || !message.trim()}
+                disabled={loading || isTimeExpired || !message.trim()}
                 className="rounded-md bg-ink px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? 'Antwort wird erzeugt...' : 'Senden'}

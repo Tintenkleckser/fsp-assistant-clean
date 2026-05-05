@@ -87,17 +87,29 @@ type CoachMessage = {
   content: string;
 };
 
+type RegionOption = {
+  id: string;
+  name: string;
+  summary: string | null;
+  verificationStatus: string;
+};
+
 export function ProfileClient({
   email,
   initialName,
-  initialAvatarUrl
+  initialAvatarUrl,
+  initialTargetRegionId,
+  regions
 }: {
   email: string;
   initialName: string;
   initialAvatarUrl: string;
+  initialTargetRegionId: string;
+  regions: RegionOption[];
 }) {
   const [name, setName] = useState(initialName);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [targetRegionId, setTargetRegionId] = useState(initialTargetRegionId);
   const [password, setPassword] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -125,6 +137,18 @@ export function ProfileClient({
 
       if (error) {
         setProfileError(error.message);
+        return;
+      }
+
+      const preferencesResponse = await fetch('/api/profile/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetRegionId: targetRegionId || null })
+      });
+
+      if (!preferencesResponse.ok) {
+        const data = await preferencesResponse.json().catch(() => null);
+        setProfileError(data?.error ?? 'Prüfungsregion konnte nicht gespeichert werden.');
         return;
       }
 
@@ -242,6 +266,42 @@ export function ProfileClient({
             placeholder="Leer lassen, wenn es unverändert bleiben soll"
           />
         </label>
+
+        <fieldset className="mt-5">
+          <legend className="text-sm font-medium text-slate-700">Ziel-Bundesland für die FSP</legend>
+          {regions.length === 0 ? (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Noch keine Bundesländer in Supabase gefunden.
+            </p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {regions.map((region) => (
+                <label
+                  key={region.id}
+                  className={`block cursor-pointer rounded-md border p-3 ${
+                    targetRegionId === region.id ? 'border-medical bg-mint' : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <input
+                    className="sr-only"
+                    type="radio"
+                    name="targetRegionId"
+                    value={region.id}
+                    checked={targetRegionId === region.id}
+                    onChange={() => setTargetRegionId(region.id)}
+                  />
+                  <span className="block text-sm font-semibold text-ink">{region.name}</span>
+                  {region.summary ? (
+                    <span className="mt-1 block text-xs leading-5 text-slate-600">{region.summary}</span>
+                  ) : null}
+                  <span className="mt-2 inline-block rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                    {region.verificationStatus}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+        </fieldset>
 
         {profileError ? (
           <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

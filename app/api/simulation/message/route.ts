@@ -4,6 +4,25 @@ import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+function languageModeInstructions(languageMode: string) {
+  if (languageMode === 'turkish_practice') {
+    return `Antwortformat fuer tuerkischen Lernmodus:
+1. TR Anlama: Reagiere kurz auf Tuerkisch auf den Inhalt der User-Antwort und klaere, ob die medizinische/kommunikative Absicht richtig ist.
+2. DE Pruefungssatz: Formuliere danach eine knappe, pruefungstaugliche deutsche Antwort, die der Kandidat in der FSP sagen oder schreiben koennte.
+3. Zeitstrategie: Gib einen sehr kurzen Hinweis, wie dieselbe Antwort schneller und priorisierter innerhalb des Zeitlimits gesagt werden kann.
+Wichtig: In diesem Modus darf der Kandidat auf Tuerkisch arbeiten. Behandle Tuerkisch nicht als Fehler, sondern als Lernbruecke. Fuehre aber konsequent zur deutschen Zielformulierung zurueck.`;
+  }
+
+  if (languageMode === 'bilingual') {
+    return `Antwortformat:
+1. Rolle: Antworte zuerst auf Deutsch in der Pruefungsrolle.
+2. TR Koçluk: Gib danach auf Tuerkisch maximal zwei kurze Hinweise: eine bessere deutsche Formulierung oder ein relevantes Wort, und einen Zeit-/Strukturhinweis.
+Die tuerkische Hilfe darf nicht die ganze Loesung ersetzen.`;
+  }
+
+  return 'Antworte ausschliesslich auf Deutsch in der Pruefungsrolle.';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
@@ -47,12 +66,8 @@ Du bist Teil einer FSP-Uebung. Antworte in deiner Rolle, knapp und realistisch.
 Bleibe im Szenario. Bewerte den Kandidaten noch nicht, sondern fuehre die Simulation fort.
 Wenn der Kandidat medizinische Fachsprache gegenueber einem Patienten verwendet, reagiere als Patient verstaendnislos.
 Die Zielgruppe sind Aerztinnen und Aerzte aus der Tuerkei, die Deutsch fuer die Fachsprachenpruefung lernen.
-${simulation.languageMode === 'bilingual'
-  ? `Antwortformat:
-1. Rolle: Antworte zuerst auf Deutsch in der Pruefungsrolle.
-2. TR Koçluk: Gib danach auf Tuerkisch maximal zwei kurze Hinweise: eine bessere deutsche Formulierung oder ein relevantes Wort, und einen Zeit-/Strukturhinweis.
-Die tuerkische Hilfe darf nicht die ganze Loesung ersetzen.`
-  : 'Antworte ausschliesslich auf Deutsch in der Pruefungsrolle.'}
+Alle Aufgaben sind zeitkritisch. Halte deine Antworten knapp, damit der Kandidat unter Pruefungsbedingungen trainiert.
+${languageModeInstructions(simulation.languageMode)}
 `;
 
     const llmResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {

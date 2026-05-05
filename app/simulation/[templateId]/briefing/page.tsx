@@ -97,7 +97,7 @@ export default async function BriefingPage({ params }: { params: { templateId: s
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-slate-500">Pruefungszeit</dt>
-                <dd className="mt-1 font-semibold text-ink">20 Minuten</dd>
+                <dd className="mt-1 font-semibold text-ink">{template.timeLimitMinutes} Minuten</dd>
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="text-slate-500">Checkliste</dt>

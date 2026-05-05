@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+const LANGUAGE_MODES = new Set(['german_only', 'bilingual', 'turkish_practice']);
+
 export async function GET() {
   const user = await getAuthUser();
 
@@ -32,6 +34,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const templateId = String(body?.templateId ?? '');
+  const requestedLanguageMode = String(body?.languageMode ?? 'german_only');
+  const languageMode = LANGUAGE_MODES.has(requestedLanguageMode) ? requestedLanguageMode : 'german_only';
 
   if (!templateId) {
     return NextResponse.json({ error: 'templateId required' }, { status: 400 });
@@ -49,7 +53,7 @@ export async function POST(request: NextRequest) {
     data: {
       userId: user.id,
       templateId,
-      languageMode: String(body?.languageMode ?? 'german_only'),
+      languageMode,
       status: 'in_progress'
     }
   });

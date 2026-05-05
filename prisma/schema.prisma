@@ -12,11 +12,95 @@ model Profile {
   id             String           @id @default(uuid())
   email          String           @unique
   nativeLanguage String           @default("tr") @map("native_language")
+  targetRegionId String?          @map("target_region_id")
   createdAt      DateTime         @default(now()) @map("created_at")
+  targetRegion   FspRegion?       @relation(fields: [targetRegionId], references: [id], onDelete: SetNull)
   simulations    UserSimulation[]
   progress       FspProgress[]
 
   @@map("profiles")
+}
+
+model FspRegion {
+  id                 String                  @id
+  name               String                  @unique
+  authorityName      String?                 @map("authority_name")
+  examProvider       String?                 @map("exam_provider")
+  summary            String?                 @db.Text
+  defaultLanguageAid String                  @default("tr") @map("default_language_aid")
+  verificationStatus String                  @default("draft") @map("verification_status")
+  lastVerifiedAt     DateTime?               @map("last_verified_at")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+  profiles           Profile[]
+  sources            FspSource[]
+  examParts          FspExamPart[]
+  requirements       FspRegionRequirement[]
+
+  @@map("fsp_regions")
+}
+
+model FspSource {
+  id             String    @id @default(uuid())
+  regionId       String    @map("region_id")
+  title          String
+  publisher      String?
+  url            String    @db.Text
+  sourceType     String    @default("official") @map("source_type")
+  retrievedAt    DateTime  @default(now()) @map("retrieved_at")
+  lastVerifiedAt DateTime? @map("last_verified_at")
+  notes          String?   @db.Text
+  region         FspRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@index([regionId])
+  @@map("fsp_sources")
+}
+
+model FspExamPart {
+  id              String                 @id @default(uuid())
+  regionId        String                 @map("region_id")
+  partKey         String                 @map("part_key")
+  title           String
+  durationMinutes Int?                   @map("duration_minutes")
+  sequenceOrder   Int                    @map("sequence_order")
+  setting         String?                @db.Text
+  languageFocus   String[]               @default([]) @map("language_focus")
+  requiredOutput  String?                @map("required_output") @db.Text
+  isCorePart      Boolean                @default(true) @map("is_core_part")
+  verificationStatus String              @default("draft") @map("verification_status")
+  trainingImpact  String?                @map("training_impact") @db.Text
+  sourceRefs      String[]               @default([]) @map("source_refs")
+  region          FspRegion              @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  requirements    FspRegionRequirement[]
+
+  @@unique([regionId, partKey])
+  @@index([regionId])
+  @@map("fsp_exam_parts")
+}
+
+model FspRegionRequirement {
+  id                 String       @id @default(uuid())
+  regionId           String       @map("region_id")
+  examPartId         String?      @map("exam_part_id")
+  partKey            String?      @map("part_key")
+  requirementType    String       @map("requirement_type")
+  title              String
+  description        String       @db.Text
+  trainingImpact     String       @map("training_impact") @db.Text
+  severity           String       @default("important")
+  examples           Json         @default("[]")
+  evaluationHints    Json         @default("[]") @map("evaluation_hints")
+  promptDirectives   Json         @default("[]") @map("prompt_directives")
+  verificationStatus String       @default("draft") @map("verification_status")
+  sourceRefs         String[]     @default([]) @map("source_refs")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  region             FspRegion    @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  examPart           FspExamPart? @relation(fields: [examPartId], references: [id], onDelete: SetNull)
+
+  @@index([regionId])
+  @@index([partKey])
+  @@map("fsp_region_requirements")
 }
 
 model SimulationTemplate {
@@ -32,6 +116,7 @@ model SimulationTemplate {
   evaluationCriteria Json             @default("[]") @map("evaluation_criteria")
   checklist          Json             @default("[]")
   maxTurns           Int              @default(8) @map("max_turns")
+  timeLimitMinutes   Int              @default(20) @map("time_limit_minutes")
   simulations        UserSimulation[]
 
   @@map("simulation_templates")

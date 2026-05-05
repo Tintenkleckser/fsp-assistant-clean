@@ -16,6 +16,14 @@ type GeneratedExamPart = {
   checklist?: unknown;
 };
 
+type PartConfig = {
+  id: string;
+  label: string;
+  short: string;
+  description: string;
+  timeLimitMin: number;
+};
+
 function extractJson(content: string) {
   const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const firstBrace = cleaned.indexOf('{');
@@ -32,6 +40,21 @@ function maxTurnsForDifficulty(difficultyId: string) {
   return difficultyId === 'beginner' ? 8 : difficultyId === 'intermediate' ? 10 : 12;
 }
 
+function getPartConfig(partKey: string): PartConfig | null {
+  const normalizedKey = partKey === 'patient_interview' ? 'patient_conversation' : partKey;
+  const staticPart = getSimulationType(normalizedKey);
+
+  if (!staticPart) return null;
+
+  return {
+    id: partKey || staticPart.id,
+    label: staticPart.label,
+    short: staticPart.short,
+    description: staticPart.description,
+    timeLimitMin: staticPart.timeLimitMin
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
@@ -42,7 +65,43 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const difficulty = getDifficulty(String(body?.difficulty ?? ''));
     const practiceMode = getPracticeMode(String(body?.practiceMode ?? 'single_part')) ?? getPracticeMode('single_part');
-    const simulationType = getSimulationType(String(body?.simulationType ?? ''));
+    const requestedPartKey = String(body?.partKey ?? body?.simulationType ?? '');
+    const regionId = body?.regionId ? String(body.regionId) : user.targetRegionId;
+    const regionContext = regionId
+      ? await prisma.fspRegion.findUnique({
+          where: { id: regionId },
+          include: {
+            examParts: { orderBy: { sequenceOrder: 'asc' } },
+            requirements: true
+          }
+        })
+      : null;
+    const regionalPart = regionContext?.examParts.find((part) => part.partKey === requestedPartKey);
+    const fallbackSimulationType = getPartConfig(requestedPartKey);
+    const simulationType: PartConfig | null = regionalPart
+      ? {
+          id: regionalPart.partKey,
+          label: regionalPart.title,
+          short: regionalPart.title,
+          description: regionalPart.requiredOutput ?? regionalPart.trainingImpact ?? regionalPart.setting ?? regionalPart.title,
+          timeLimitMin: regionalPart.durationMinutes ?? 20
+        }
+      : fallbackSimulationType;
+    const regionalRequirements = regionContext?.requirements.filter((requirement) => {
+      if (practiceMode?.id === 'full_exam') return true;
+      return !requirement.partKey || requirement.partKey === requestedPartKey;
+    }) ?? [];
+    const regionalPromptDirectives = regionalRequirements
+      .flatMap((requirement) => Array.isArray(requirement.promptDirectives) ? requirement.promptDirectives : [])
+      .map((item) => `- ${String(item)}`)
+      .join('\n');
+    const regionalEvaluationHints = regionalRequirements
+      .flatMap((requirement) => Array.isArray(requirement.evaluationHints) ? requirement.evaluationHints : [])
+      .map((item) => `- ${String(item)}`)
+      .join('\n');
+    const regionalRequirementSummary = regionalRequirements
+      .map((requirement) => `- ${requirement.title}: ${requirement.trainingImpact}`)
+      .join('\n');
 
     if (!difficulty || !practiceMode || (practiceMode.id === 'single_part' && !simulationType)) {
       return NextResponse.json({ error: 'Pruefungsteil und Schwierigkeit sind erforderlich.' }, { status: 400 });
@@ -61,6 +120,7 @@ export async function POST(request: NextRequest) {
 Erstelle EINE zusammenhaengende komplette FSP-Pruefung als Fallkette.
 
 Schwierigkeit: ${difficulty.label} - ${difficulty.description}
+${regionContext ? `\nZiel-Bundesland: ${regionContext.name}\nRegionale Anforderungen:\n${regionalRequirementSummary || 'Keine besonderen Anforderungen hinterlegt.'}` : ''}
 
 Wichtig:
 - Alle drei Pruefungsteile muessen denselben Patientenfall verwenden.
@@ -70,6 +130,8 @@ Wichtig:
 - Die Informationen duerfen sich ueber die Teile entwickeln, aber nicht widersprechen.
 - Zielgruppe: Aerztinnen und Aerzte aus der Tuerkei, zweisprachige Lernhilfe Deutsch/Tuerkisch.
 - Es geht um Sprachkompetenz, Struktur, Zeitmanagement und Pruefungsstrategie.
+- Alle Teile sind zeitkritisch. Das Szenario muss realistisch innerhalb des jeweiligen Zeitlimits trainierbar sein.
+${regionalPromptDirectives ? `\nRegionale Prompt-Vorgaben:\n${regionalPromptDirectives}` : ''}
 
 Antworte ausschliesslich als valides JSON:
 {
@@ -138,10 +200,15 @@ Jede Checkliste: 8 bis 12 Items. weight: 1 normal, 2 wichtig, 3 kritisch.`;
               examId,
               caseTitleDe: String(parsed.caseTitleDe ?? 'FSP-Gesamtpruefung'),
               caseTitleTr: String(parsed.caseTitleTr ?? ''),
-              partOrder: index + 1
+              partOrder: index + 1,
+              timeLimitMinutes: part.timeLimitMin,
+              timingPolicy: 'strict',
+              regionId: regionContext?.id ?? null,
+              regionName: regionContext?.name ?? null
             },
             checklist: Array.isArray(parsedPart.checklist) ? parsedPart.checklist : [],
-            maxTurns
+            maxTurns,
+            timeLimitMinutes: part.timeLimitMin
           }
         });
       }));
@@ -165,6 +232,7 @@ Erstelle ein realistisches FSP-Uebungsszenario.
 Pruefungsteil: ${simulationType.label}
 Beschreibung: ${simulationType.description}
 Schwierigkeit: ${difficulty.label} - ${difficulty.description}
+${regionContext ? `\nZiel-Bundesland: ${regionContext.name}\nRegionale Anforderungen:\n${regionalRequirementSummary || 'Keine besonderen Anforderungen hinterlegt.'}` : ''}
 
 Wichtig:
 - Es geht um Sprachkompetenz, nicht um medizinisches Fachwissen.
@@ -173,6 +241,8 @@ Wichtig:
 - Bei Teil 1 muss die Sprache laienverstaendlich sein.
 - Bei Teil 3 ist Fachsprache gewuenscht.
 - Die Checkliste bewertet Kommunikation, Struktur und sprachliche Angemessenheit.
+- Das Zeitlimit von ${simulationType.timeLimitMin} Minuten ist strikt. Aufgabe, Rollenverhalten und Checkliste muessen Zeitmanagement bewerten.
+${regionalPromptDirectives ? `\nRegionale Prompt-Vorgaben:\n${regionalPromptDirectives}` : ''}
 
 Antworte ausschliesslich als valides JSON:
 {
@@ -224,9 +294,23 @@ Checkliste: 8 bis 12 Items. weight: 1 normal, 2 wichtig, 3 kritisch.`;
         descriptionDe: String(parsed.descriptionDe ?? simulationType.description),
         descriptionTr: String(parsed.descriptionTr ?? ''),
         systemPrompt: String(parsed.systemPrompt ?? ''),
-        evaluationCriteria: Array.isArray(parsed.evaluationCriteria) ? parsed.evaluationCriteria : [],
+        evaluationCriteria: {
+          criteria: Array.isArray(parsed.evaluationCriteria) ? parsed.evaluationCriteria : [],
+          timeLimitMinutes: simulationType.timeLimitMin,
+          timingPolicy: 'strict',
+          regionId: regionContext?.id ?? null,
+          regionName: regionContext?.name ?? null,
+          regionalRequirements: regionalRequirements.map((requirement) => ({
+            type: requirement.requirementType,
+            title: requirement.title,
+            severity: requirement.severity,
+            trainingImpact: requirement.trainingImpact
+          })),
+          regionalEvaluationHints
+        },
         checklist: Array.isArray(parsed.checklist) ? parsed.checklist : [],
-        maxTurns
+        maxTurns,
+        timeLimitMinutes: simulationType.timeLimitMin
       }
     });
 
