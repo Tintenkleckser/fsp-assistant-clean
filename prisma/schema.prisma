@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Profile {
-  id             String           @id @default(uuid())
+  id             String           @id @default(uuid()) @db.Uuid
   email          String           @unique
   nativeLanguage String           @default("tr") @map("native_language")
   targetRegionId String?          @map("target_region_id")
@@ -41,7 +41,7 @@ model FspRegion {
 }
 
 model FspSource {
-  id             String    @id @default(uuid())
+  id             String    @id @default(uuid()) @db.Uuid
   regionId       String    @map("region_id")
   title          String
   publisher      String?
@@ -57,7 +57,7 @@ model FspSource {
 }
 
 model FspExamPart {
-  id              String                 @id @default(uuid())
+  id              String                 @id @default(uuid()) @db.Uuid
   regionId        String                 @map("region_id")
   partKey         String                 @map("part_key")
   title           String
@@ -79,9 +79,9 @@ model FspExamPart {
 }
 
 model FspRegionRequirement {
-  id                 String       @id @default(uuid())
+  id                 String       @id @default(uuid()) @db.Uuid
   regionId           String       @map("region_id")
-  examPartId         String?      @map("exam_part_id")
+  examPartId         String?      @map("exam_part_id") @db.Uuid
   partKey            String?      @map("part_key")
   requirementType    String       @map("requirement_type")
   title              String
@@ -104,7 +104,7 @@ model FspRegionRequirement {
 }
 
 model SimulationTemplate {
-  id                 String           @id @default(uuid())
+  id                 String           @id @default(uuid()) @db.Uuid
   domain             String           @default("nursing")
   type               String           @default("oral_exam")
   difficulty         String           @default("intermediate")
@@ -123,9 +123,9 @@ model SimulationTemplate {
 }
 
 model UserSimulation {
-  id             String                  @id @default(uuid())
-  userId         String                  @map("user_id")
-  templateId     String                  @map("template_id")
+  id             String                  @id @default(uuid()) @db.Uuid
+  userId         String                  @map("user_id") @db.Uuid
+  templateId     String                  @map("template_id") @db.Uuid
   status         String                  @default("in_progress")
   languageMode   String                  @default("bilingual") @map("language_mode")
   documentation  String?                 @db.Text
@@ -140,8 +140,8 @@ model UserSimulation {
 }
 
 model SimulationInteraction {
-  id           String         @id @default(uuid())
-  simulationId String         @map("simulation_id")
+  id           String         @id @default(uuid()) @db.Uuid
+  simulationId String         @map("simulation_id") @db.Uuid
   turnNumber   Int            @map("turn_number")
   userInput    String         @map("user_input") @db.Text
   aiResponse   String         @map("ai_response") @db.Text
@@ -152,8 +152,8 @@ model SimulationInteraction {
 }
 
 model Evaluation {
-  id                 String         @id @default(uuid())
-  simulationId       String         @unique @map("simulation_id")
+  id                 String         @id @default(uuid()) @db.Uuid
+  simulationId       String         @unique @map("simulation_id") @db.Uuid
   feedbackDe         String         @map("feedback_de") @db.Text
   feedbackTr         String         @map("feedback_tr") @db.Text
   scores             Json           @default("{}")
@@ -170,7 +170,7 @@ model Evaluation {
 }
 
 model GlossaryTerm {
-  id        String @id @default(uuid())
+  id        String @id @default(uuid()) @db.Uuid
   termDe    String @map("term_de")
   termTr    String @map("term_tr")
   contextDe String @map("context_de") @db.Text
@@ -180,8 +180,8 @@ model GlossaryTerm {
 }
 
 model FspProgress {
-  id               String   @id @default(uuid())
-  userId           String   @map("user_id")
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
   sessionDate      DateTime @default(now()) @map("session_date")
   topic            String?
   proficiencyLevel Int?     @map("proficiency_level")
@@ -198,7 +198,7 @@ model FspProgress {
 }
 
 model HandbookSection {
-  id         String   @id @default(uuid())
+  id         String   @id @default(uuid()) @db.Uuid
   domain     String   @default("nursing")
   partNumber Int      @map("part_number")
   sectionIdx Int      @map("section_idx")
