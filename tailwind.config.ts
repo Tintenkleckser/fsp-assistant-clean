@@ -6,8 +6,8 @@ const config: Config = {
     extend: {
       colors: {
         ink: '#132238',
-        medical: '#0f8a9d',
-        mint: '#d9f3ee',
+        medical: '#4A90E2',
+        mint: '#EAF3FD',
         paper: '#f7f9fb'
       }
     }
