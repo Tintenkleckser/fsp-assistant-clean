@@ -107,7 +107,7 @@ export function RegisterForm() {
       </label>
 
       <button
-        className="w-full rounded-md bg-ink px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md bg-medical px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
         disabled={loading}
       >
