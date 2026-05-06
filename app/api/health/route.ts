@@ -1,31 +1,15 @@
 import { NextResponse } from 'next/server';
+import { inspectDatabaseUrl } from '@/lib/database-url';
 
 export const dynamic = 'force-dynamic';
 
 const requiredEnv = [
-  'DATABASE_URL',
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'MISTRAL_API_KEY'
 ];
 
-const optionalEnv = ['DIRECT_URL'];
-
-function inspectDatabaseUrl(value: string | undefined) {
-  const raw = value ?? '';
-  const trimmed = raw.trim();
-
-  return {
-    present: raw.length > 0,
-    length: raw.length,
-    trimmedLength: trimmed.length,
-    startsWithPostgres: trimmed.startsWith('postgresql://') || trimmed.startsWith('postgres://'),
-    startsWithHttps: trimmed.startsWith('https://'),
-    startsWithKeyName: trimmed.startsWith('DATABASE_URL='),
-    startsWithQuote: trimmed.startsWith('"') || trimmed.startsWith("'"),
-    hasLeadingOrTrailingWhitespace: raw !== trimmed
-  };
-}
+const optionalEnv = ['DATABASE_URL', 'SUPABASE_DATABASE_URL', 'DATABASE_URL_OVERRIDE', 'POSTGRES_PRISMA_URL', 'DIRECT_URL'];
 
 export async function GET() {
   const env = Object.fromEntries(
@@ -34,7 +18,7 @@ export async function GET() {
   const optional = Object.fromEntries(
     optionalEnv.map((key) => [key, Boolean(process.env[key])])
   );
-  const databaseUrl = inspectDatabaseUrl(process.env.DATABASE_URL);
+  const databaseUrl = inspectDatabaseUrl();
 
   return NextResponse.json({
     ok: Object.values(env).every(Boolean) && databaseUrl.startsWithPostgres,

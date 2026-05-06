@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
+import { inspectDatabaseUrl } from '@/lib/database-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,22 +20,6 @@ async function runCheck(name: string, check: () => Promise<unknown>): Promise<[s
       error: error instanceof Error ? error.message : String(error)
     }];
   }
-}
-
-function inspectDatabaseUrl(value: string | undefined) {
-  const raw = value ?? '';
-  const trimmed = raw.trim();
-
-  return {
-    present: raw.length > 0,
-    length: raw.length,
-    trimmedLength: trimmed.length,
-    startsWithPostgres: trimmed.startsWith('postgresql://') || trimmed.startsWith('postgres://'),
-    startsWithHttps: trimmed.startsWith('https://'),
-    startsWithKeyName: trimmed.startsWith('DATABASE_URL='),
-    startsWithQuote: trimmed.startsWith('"') || trimmed.startsWith("'"),
-    hasLeadingOrTrailingWhitespace: raw !== trimmed
-  };
 }
 
 export async function GET() {
@@ -117,7 +102,7 @@ export async function GET() {
     service: 'fsp-assistant-clean',
     commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
-    databaseUrl: inspectDatabaseUrl(process.env.DATABASE_URL),
+    databaseUrl: inspectDatabaseUrl(),
     auth: {
       ok: Boolean(user) && !authError,
       userIdPresent: Boolean(user?.id),
