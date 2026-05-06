@@ -8,16 +8,35 @@ function isPostgresUrl(value: string) {
   return value.startsWith('postgresql://') || value.startsWith('postgres://');
 }
 
+function normalizeDatabaseUrl(value: string | undefined) {
+  let normalized = value?.trim() ?? '';
+
+  if (
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+  ) {
+    normalized = normalized.slice(1, -1).trim();
+  }
+
+  const envAssignment = normalized.match(/^[A-Z0-9_]+\s*=\s*(.+)$/);
+
+  if (envAssignment) {
+    normalized = envAssignment[1].trim();
+  }
+
+  return normalized;
+}
+
 function getConfiguredDatabaseUrl() {
   for (const key of databaseUrlOverrideKeys) {
-    const value = process.env[key]?.trim();
+    const value = normalizeDatabaseUrl(process.env[key]);
 
     if (value && isPostgresUrl(value)) {
       return { key, value };
     }
   }
 
-  const value = process.env.DATABASE_URL?.trim() ?? '';
+  const value = normalizeDatabaseUrl(process.env.DATABASE_URL);
   return { key: 'DATABASE_URL', value };
 }
 
@@ -58,6 +77,7 @@ export function inspectDatabaseUrl() {
     startsWithKeyName: trimmed.startsWith('DATABASE_URL='),
     startsWithQuote: trimmed.startsWith('"') || trimmed.startsWith("'"),
     hasLeadingOrTrailingWhitespace: raw !== raw.trim(),
+    normalizedFromAssignment: raw.trim() !== trimmed,
     host,
     username
   };
