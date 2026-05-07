@@ -1,115 +1,174 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/supabase/auth-helpers';
+import { NextResponse } from 'next/server';
+import { withAuth, handleError, ApiError } from '@/lib/api/middleware';
 import { prisma } from '@/lib/db';
+import { MessageSchema } from '@/lib/schemas';
+import { logger } from '@/lib/logger';
+
+/**
+ * POST /api/simulation/message
+ * Saves a message to a simulation
+ */
+export const POST = async (req: Request) => {
+  return withAuth(async (user) => {
+    try {
+      // Validate request body
+      const body = await req.json();
+      const { simulationId, role, content } = MessageSchema.parse(body);
+
+      // Verify simulation exists and belongs to user
+      const simulation = await prisma.simulation.findFirst({
+        where: {
+          id: simulationId,
+          userId: user.id,
+        },
+        select: { id: true, status: true },
+      });
+
+      if (!simulation) {
+        throw new ApiError(404, 'Simulation not found or access denied', { simulationId });
+      }
+
+      // Create message
+      const message = await prisma.message.create({
+        data: {
+          role,
+          content,
+          simulationId,
+        },
+      });
+
+      logger.info('Message saved to simulation', {
+        userId: user.id,
+        simulationId,
+        messageId: message.id,
+        role,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message,
+      });
+    } catch (error) {
+      logger.error('Save message error', {
+        error,
+        userId: user?.id,
+        requestBody: await req.json().catch(() => null),
+      });
+      return handleError(error);
+    }
+  });
+};
+
+/**
+ * GET /api/simulation/message
+ * Retrieves messages for a simulation
+ */
+export const GET = async (req: Request) => {
+  return withAuth(async (user) => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const simulationId = searchParams.get('simulationId');
+      const limit = parseInt(searchParams.get('limit') || '50');
+      const offset = parseInt(searchParams.get('offset') || '0');
+
+      if (!simulationId) {
+        throw new ApiError(400, 'simulationId query parameter is required');
+      }
+
+      // Verify simulation exists and belongs to user
+      const simulation = await prisma.simulation.findFirst({
+        where: {
+          id: simulationId,
+          userId: user.id,
+        },
+        select: { id: true },
+      });
+
+      if (!simulation) {
+        throw new ApiError(404, 'Simulation not found or access denied', { simulationId });
+      }
+
+      // Get messages
+      const messages = await prisma.message.findMany({
+        where: { simulationId },
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+        skip: offset,
+      });
+
+      logger.info('Messages retrieved for simulation', {
+        userId: user.id,
+        simulationId,
+        messageCount: messages.length,
+      });
+
+      return NextResponse.json({
+        success: true,
+        messages,
+        count: messages.length,
+      });
+    } catch (error) {
+      logger.error('Get messages error', {
+        error,
+        userId: user?.id,
+      });
+      return handleError(error);
+    }
+  });
+};
+
+/**
+ * DELETE /api/simulation/message
+ * Deletes a message from a simulation
+ */
+export const DELETE = async (req: Request) => {
+  return withAuth(async (user) => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const messageId = searchParams.get('id');
+
+      if (!messageId) {
+        throw new ApiError(400, 'id query parameter is required');
+      }
+
+      // Verify message exists and belongs to user's simulation
+      const message = await prisma.message.findFirst({
+        where: {
+          id: messageId,
+          simulation: {
+            userId: user.id,
+          },
+        },
+        select: { id: true, simulationId: true },
+      });
+
+      if (!message) {
+        throw new ApiError(404, 'Message not found or access denied', { messageId });
+      }
+
+      // Delete message
+      await prisma.message.delete({
+        where: { id: messageId },
+      });
+
+      logger.info('Message deleted from simulation', {
+        userId: user.id,
+        messageId,
+        simulationId: message.simulationId,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: { id: messageId },
+      });
+    } catch (error) {
+      logger.error('Delete message error', {
+        error,
+        userId: user?.id,
+      });
+      return handleError(error);
+    }
+  });
+};
 
 export const dynamic = 'force-dynamic';
-
-function languageModeInstructions(languageMode: string) {
-  if (languageMode === 'turkish_practice') {
-    return `Antwortformat fuer tuerkischen Lernmodus:
-1. TR Anlama: Reagiere kurz auf Tuerkisch auf den Inhalt der User-Antwort und klaere, ob die medizinische/kommunikative Absicht richtig ist.
-2. DE Pruefungssatz: Formuliere danach eine knappe, pruefungstaugliche deutsche Antwort, die der Kandidat in der FSP sagen oder schreiben koennte.
-3. Zeitstrategie: Gib einen sehr kurzen Hinweis, wie dieselbe Antwort schneller und priorisierter innerhalb des Zeitlimits gesagt werden kann.
-Wichtig: In diesem Modus darf der Kandidat auf Tuerkisch arbeiten. Behandle Tuerkisch nicht als Fehler, sondern als Lernbruecke. Fuehre aber konsequent zur deutschen Zielformulierung zurueck.`;
-  }
-
-  if (languageMode === 'bilingual') {
-    return `Antwortformat:
-1. Rolle: Antworte zuerst auf Deutsch in der Pruefungsrolle.
-2. TR Koçluk: Gib danach auf Tuerkisch maximal zwei kurze Hinweise: eine bessere deutsche Formulierung oder ein relevantes Wort, und einen Zeit-/Strukturhinweis.
-Die tuerkische Hilfe darf nicht die ganze Loesung ersetzen.`;
-  }
-
-  return 'Antworte ausschliesslich auf Deutsch in der Pruefungsrolle.';
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getAuthUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const simId = String(body?.simId ?? '');
-    const userMessage = String(body?.userMessage ?? '').trim();
-
-    if (!simId || !userMessage) {
-      return NextResponse.json({ error: 'simId and userMessage are required' }, { status: 400 });
-    }
-
-    if (!process.env.MISTRAL_API_KEY) {
-      return NextResponse.json({ error: 'MISTRAL_API_KEY fehlt in Vercel.' }, { status: 500 });
-    }
-
-    const simulation = await prisma.userSimulation.findFirst({
-      where: { id: simId, userId: user.id },
-      include: {
-        template: true,
-        interactions: { orderBy: { turnNumber: 'asc' } }
-      }
-    });
-
-    if (!simulation) {
-      return NextResponse.json({ error: 'Simulation not found' }, { status: 404 });
-    }
-
-    const previousMessages = simulation.interactions.flatMap((interaction) => [
-      { role: 'user' as const, content: interaction.userInput },
-      { role: 'assistant' as const, content: interaction.aiResponse }
-    ]);
-
-    const systemPrompt = `${simulation.template.systemPrompt}
-
-Du bist Teil einer FSP-Uebung. Antworte in deiner Rolle, knapp und realistisch.
-Bleibe im Szenario. Bewerte den Kandidaten noch nicht, sondern fuehre die Simulation fort.
-Wenn der Kandidat medizinische Fachsprache gegenueber einem Patienten verwendet, reagiere als Patient verstaendnislos.
-Die Zielgruppe sind Aerztinnen und Aerzte aus der Tuerkei, die Deutsch fuer die Fachsprachenpruefung lernen.
-Alle Aufgaben sind zeitkritisch. Halte deine Antworten knapp, damit der Kandidat unter Pruefungsbedingungen trainiert.
-${languageModeInstructions(simulation.languageMode)}
-`;
-
-    const llmResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'mistral-large-latest',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...previousMessages,
-          { role: 'user', content: userMessage }
-        ],
-        max_tokens: 700,
-        temperature: 0.7
-      })
-    });
-
-    if (!llmResponse.ok) {
-      const message = await llmResponse.text().catch(() => '');
-      console.error('Mistral message error:', llmResponse.status, message);
-      return NextResponse.json({ error: 'LLM-API-Fehler im Chat.' }, { status: 502 });
-    }
-
-    const data = await llmResponse.json();
-    const aiResponse = String(data?.choices?.[0]?.message?.content ?? '').trim();
-    const turnNumber = simulation.interactions.length + 1;
-
-    const interaction = await prisma.simulationInteraction.create({
-      data: {
-        simulationId: simulation.id,
-        turnNumber,
-        userInput: userMessage,
-        aiResponse
-      }
-    });
-
-    return NextResponse.json({ interaction });
-  } catch (error) {
-    console.error('Simulation message error:', error);
-    return NextResponse.json({ error: 'Chat-Nachricht konnte nicht verarbeitet werden.' }, { status: 500 });
-  }
-}
