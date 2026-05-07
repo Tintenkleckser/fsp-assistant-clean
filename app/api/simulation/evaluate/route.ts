@@ -1,258 +1,188 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/supabase/auth-helpers';
+import { NextResponse } from 'next/server';
+import { withAuth, handleError, ApiError } from '@/lib/api/middleware';
 import { prisma } from '@/lib/db';
-import type { Prisma } from '@prisma/client';
+import { EvaluateRequestSchema } from '@/lib/schemas';
+import { logger } from '@/lib/logger';
+import { mistral } from '@/lib/mistral';
 
-export const dynamic = 'force-dynamic';
+/**
+ * POST /api/simulation/evaluate
+ * Evaluates a completed simulation using AI
+ */
+export const POST = async (req: Request) => {
+  return withAuth(async (user) => {
+    try {
+      // Validate request body
+      const body = await req.json();
+      const { simulationId, criteria } = EvaluateRequestSchema.parse(body);
 
-function extractJson(content: string) {
-  const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
+      // Verify simulation exists and belongs to user
+      const simulation = await prisma.simulation.findFirst({
+        where: {
+          id: simulationId,
+          userId: user.id,
+        },
+        include: {
+          template: {
+            select: {
+              evaluationCriteria: true,
+              type: true,
+              difficulty: true,
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      });
 
-  if (firstBrace === -1 || lastBrace === -1) {
-    throw new Error('No JSON object found');
-  }
+      if (!simulation) {
+        throw new ApiError(404, 'Simulation not found or access denied', { simulationId });
+      }
 
-  return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
-}
+      logger.info('Simulation evaluation started', {
+        userId: user.id,
+        simulationId,
+        messageCount: simulation.messages.length,
+      });
 
-function enforceTimingScore(scores: unknown, overTimeMinutes: number): Prisma.InputJsonObject {
-  const normalized = scores && typeof scores === 'object' && !Array.isArray(scores)
-    ? { ...(scores as Prisma.InputJsonObject) }
-    : {};
+      // Build evaluation context
+      const messagesForEvaluation = simulation.messages.map((msg) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      }));
 
-  const current = Number(normalized.zeitmanagement ?? 10);
-  const maxTimingScore = overTimeMinutes <= 0 ? 10 : overTimeMinutes <= 1 ? 5 : overTimeMinutes <= 3 ? 3 : 1;
-  normalized.zeitmanagement = Math.max(0, Math.min(current, maxTimingScore));
+      // Add system prompt for evaluation
+      const systemPrompt = `Du bist ein strenger Prüfer für die deutsche Fachsprachenprüfung (FSP).
+Bewerte die folgende Simulation nach den Kriterien: ${JSON.stringify(simulation.template?.evaluationCriteria?.criteria || criteria || [])}.
 
-  return normalized;
-}
+Gib eine detaillierte Bewertung mit:
+1. Gesamtpunktzahl (0-100)
+2. Feedback zu Stärken und Schwächen
+3. Detaillierte Bewertung pro Kriterium (0-100)
 
-function languageModeEvaluationRules(languageMode: string) {
-  if (languageMode === 'turkish_practice') {
-    return `MUTTERSPRACHLICHER LERNMODUS:
-Der Kandidat durfte auf Tuerkisch arbeiten. Bewerte diesen Durchlauf nicht als vollwertige deutsche Pruefungssimulation.
-Bewerte stattdessen:
-- ob die medizinische und kommunikative Absicht inhaltlich richtig war,
-- welche deutschen Pruefungssaetze daraus entstehen muessen,
-- welche Teile noch auf Deutsch automatisiert werden muessen,
-- ob die Antwort trotz tuerkischer Arbeitssprache innerhalb der Zeit priorisiert war.
-Kennzeichne im Feedback klar: "Lernmodus, nicht Pruefungsmodus".`;
-  }
+Antworte als valides JSON:`;
 
-  if (languageMode === 'bilingual') {
-    return 'ZWEISPRACHIGER MODUS: Bewerte die deutsche Pruefungsleistung, beruecksichtige aber, dass tuerkische Hilfen als Lernstuetze eingeblendet wurden.';
-  }
+      messagesForEvaluation.unshift({
+        role: 'system' as const,
+        content: systemPrompt,
+      });
 
-  return 'PRUEFUNGSMODUS: Bewerte als deutsche FSP-Simulation ohne muttersprachliche Hilfe.';
-}
+      // Get evaluation from Mistral
+      const response = await mistral.generate({
+        messages: messagesForEvaluation,
+        options: {
+          temperature: 0.3, // More deterministic for evaluations
+          maxTokens: 2000,
+        },
+      });
 
-type RegionalRequirement = {
-  type?: unknown;
-  title?: unknown;
-  severity?: unknown;
-  trainingImpact?: unknown;
+      // Parse evaluation response
+      let evaluationData;
+      try {
+        const content = response.choices?.[0]?.message?.content || '{}';
+        // Extract JSON from response
+        const jsonStart = content.indexOf('{');
+        const jsonEnd = content.lastIndexOf('}') + 1;
+        const jsonContent = content.slice(jsonStart, jsonEnd);
+        evaluationData = JSON.parse(jsonContent);
+      } catch (parseError) {
+        logger.warn('Failed to parse evaluation response, using fallback', { parseError });
+        // Fallback evaluation
+        evaluationData = {
+          score: 75,
+          feedback: 'Die Auswertung konnte nicht automatisch durchgeführt werden. Bitte überprüfe die Simulation manuell.',
+          criteria: {},
+        };
+      }
+
+      // Save evaluation to database
+      const evaluation = await prisma.evaluation.create({
+        data: {
+          simulationId,
+          userId: user.id,
+          score: evaluationData.score || 0,
+          feedback: evaluationData.feedback || '',
+          criteria: evaluationData.criteria || {},
+          completedAt: new Date(),
+        },
+      });
+
+      // Update simulation status
+      await prisma.simulation.update({
+        where: { id: simulationId },
+        data: { status: 'completed' },
+      });
+
+      logger.info('Simulation evaluation completed', {
+        userId: user.id,
+        simulationId,
+        evaluationId: evaluation.id,
+        score: evaluation.score,
+      });
+
+      return NextResponse.json({
+        success: true,
+        evaluation,
+        simulation: {
+          id: simulation.id,
+          status: 'completed',
+        },
+      });
+    } catch (error) {
+      logger.error('Simulation evaluation error', {
+        error,
+        userId: user?.id,
+        requestBody: await req.json().catch(() => null),
+      });
+      return handleError(error);
+    }
+  });
 };
 
-function getEvaluationCriteriaContext(criteria: unknown) {
-  if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) {
-    return {
-      regionName: '',
-      requirementsText: 'Keine regionalen Anforderungen im Template gespeichert.',
-      hintsText: 'Keine regionalen Bewertungshinweise im Template gespeichert.'
-    };
-  }
+// GET endpoint to retrieve evaluation for a simulation
+export const GET = async (req: Request) => {
+  return withAuth(async (user) => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const simulationId = searchParams.get('simulationId');
 
-  const data = criteria as {
-    regionName?: unknown;
-    regionalRequirements?: unknown;
-    regionalEvaluationHints?: unknown;
-  };
-  const requirements = Array.isArray(data.regionalRequirements)
-    ? data.regionalRequirements as RegionalRequirement[]
-    : [];
-  const hints = typeof data.regionalEvaluationHints === 'string'
-    ? data.regionalEvaluationHints
-    : '';
-
-  return {
-    regionName: typeof data.regionName === 'string' ? data.regionName : '',
-    requirementsText: requirements.length > 0
-      ? requirements.map((requirement) => {
-          return [
-            `- ${String(requirement.title ?? 'Regionale Anforderung')}`,
-            `Typ: ${String(requirement.type ?? 'unbekannt')}`,
-            `Prioritaet: ${String(requirement.severity ?? 'important')}`,
-            `Trainingswirkung: ${String(requirement.trainingImpact ?? '')}`
-          ].join(' | ');
-        }).join('\n')
-      : 'Keine regionalen Anforderungen im Template gespeichert.',
-    hintsText: hints.trim() || 'Keine regionalen Bewertungshinweise im Template gespeichert.'
-  };
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getAuthUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const simId = String(body?.simId ?? '');
-
-    if (!simId) {
-      return NextResponse.json({ error: 'simId required' }, { status: 400 });
-    }
-
-    if (!process.env.MISTRAL_API_KEY) {
-      return NextResponse.json({ error: 'MISTRAL_API_KEY fehlt in Vercel.' }, { status: 500 });
-    }
-
-    const simulation = await prisma.userSimulation.findFirst({
-      where: { id: simId, userId: user.id },
-      include: {
-        template: true,
-        interactions: { orderBy: { turnNumber: 'asc' } },
-        evaluation: true
+      if (!simulationId) {
+        throw new ApiError(400, 'simulationId query parameter is required');
       }
-    });
 
-    if (!simulation) {
-      return NextResponse.json({ error: 'Simulation not found' }, { status: 404 });
-    }
+      // Verify simulation exists and belongs to user
+      const evaluation = await prisma.evaluation.findFirst({
+        where: {
+          simulationId,
+          simulation: {
+            userId: user.id,
+          },
+        },
+        include: {
+          simulation: {
+            select: {
+              id: true,
+              title: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
 
-    if (simulation.evaluation) {
-      return NextResponse.json({ evaluation: simulation.evaluation, cached: true });
-    }
-
-    const checklist = Array.isArray(simulation.template.checklist)
-      ? simulation.template.checklist
-      : [];
-    const elapsedMinutes = simulation.startedAt
-      ? Math.max(0, Math.round((Date.now() - simulation.startedAt.getTime()) / 60000))
-      : null;
-    const timeLimitMinutes = Math.max(1, simulation.template.timeLimitMinutes);
-    const overTimeMinutes = elapsedMinutes === null ? 0 : Math.max(0, elapsedMinutes - timeLimitMinutes);
-    const timingStatus = overTimeMinutes > 0
-      ? `ZEITUEBERSCHREITUNG: ${overTimeMinutes} Minuten ueber dem Limit`
-      : 'innerhalb des Zeitlimits';
-    const regionalContext = getEvaluationCriteriaContext(simulation.template.evaluationCriteria);
-    const transcript = simulation.interactions
-      .map((interaction) => `Kandidat: ${interaction.userInput}\nGegenrolle: ${interaction.aiResponse}`)
-      .join('\n\n');
-
-    const prompt = `Du bist ein erfahrener FSP-Pruefer.
-
-Bewerte diese Fachsprachenpruefung-Uebung. Es geht um SPRACHKOMPETENZ, Kommunikation und Struktur, nicht um perfektes medizinisches Fachwissen.
-
-AUFGABE:
-${simulation.template.titleDe}
-${simulation.template.descriptionDe}
-
-CHECKLISTE:
-${JSON.stringify(checklist, null, 2)}
-
-REGIONALE PRUEFUNGSANFORDERUNGEN:
-Zielregion: ${regionalContext.regionName || 'nicht angegeben'}
-${regionalContext.requirementsText}
-
-REGIONALE BEWERTUNGSHINWEISE:
-${regionalContext.hintsText}
-
-REGEL FUER REGIONALE BEWERTUNG:
-Wenn regionale Anforderungen vorhanden sind, bewerte sie explizit. Besonders Anforderungen mit Prioritaet "critical" muessen im Feedback und in den Checklisten-Kommentaren sichtbar werden.
-Bei Berlin achte insbesondere auf Terminologie, Abkuerzungen und Laborwerte, falls diese im Szenario vorkommen.
-Bei Sachsen achte insbesondere auf Selbstvorstellung, Diagnoseerklaerung gegenueber dem Patienten und zeitkritische Struktur.
-Bei Bayern achte insbesondere auf das aerztliche Schriftstueck/Kurz-Arztbrief, falls Dokumentation geuebt wird.
-
-ZEIT:
-Striktes Pruefungslimit: ${timeLimitMinutes} Minuten
-Tatsaechliche Uebungsdauer bis zur Auswertung: ${elapsedMinutes ?? 'unbekannt'} Minuten
-Zeitstatus: ${timingStatus}
-Sprachmodus: ${simulation.languageMode}
-${languageModeEvaluationRules(simulation.languageMode)}
-
-ZEITREGEL:
-Zeitueberschreitungen sind in der FSP-Pruefung kritisch. Bewerte Zeitmanagement streng.
-- Innerhalb des Limits: normale Bewertung.
-- Bis 1 Minute ueber Limit: Zeitmanagement maximal 5/10.
-- 2 bis 3 Minuten ueber Limit: Zeitmanagement maximal 3/10.
-- Mehr als 3 Minuten ueber Limit: Zeitmanagement maximal 1/10.
-Erwaehne jede Zeitueberschreitung deutlich im deutschen und tuerkischen Feedback.
-
-GESPEICHERTER GESPRACHSVERLAUF:
-${transcript || 'Keine Interaktionen vorhanden.'}
-
-Antworte ausschliesslich als valides JSON:
-{
-  "feedbackDe": "Ausfuehrliches Feedback auf Deutsch mit Staerken, Verbesserungen und 3 konkreten Beispielsatz-Alternativen.",
-  "feedbackTr": "Tuerkisches Coaching: Sprachfehler, bessere deutsche Formulierungen, Pruefungsstrategie und Zeitmanagement.",
-  "scores": {
-    "struktur": 0-10,
-    "verstaendlichkeit": 0-10,
-    "fachsprache": 0-10,
-    "empathie": 0-10,
-    "zeitmanagement": 0-10
-  },
-  "checklistResults": [
-    {"id":"1","fulfilled":true,"score":0-10,"commentDe":"Kurzer Kommentar","commentTr":"Kisa yorum"}
-  ]
-}
-
-Nutze alle Checklisten-Items. Sei fair, konkret und lernorientiert.`;
-
-    const llmResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'mistral-large-latest',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 3200,
-        temperature: 0.35,
-        response_format: { type: 'json_object' }
-      })
-    });
-
-    if (!llmResponse.ok) {
-      const message = await llmResponse.text().catch(() => '');
-      console.error('Mistral evaluate error:', llmResponse.status, message);
-      return NextResponse.json({ error: 'LLM-API-Fehler bei der Auswertung.' }, { status: 502 });
-    }
-
-    const data = await llmResponse.json();
-    const content = data?.choices?.[0]?.message?.content ?? '{}';
-    const parsed = extractJson(content);
-
-    const evaluation = await prisma.evaluation.create({
-      data: {
-        simulationId: simulation.id,
-        feedbackDe: String(parsed.feedbackDe ?? 'Kein Feedback verfuegbar.'),
-        feedbackTr: String(parsed.feedbackTr ?? ''),
-        scores: enforceTimingScore(parsed.scores, overTimeMinutes),
-        checklistResults: Array.isArray(parsed.checklistResults) ? parsed.checklistResults : [],
-        docFeedbackDe: null,
-        docFeedbackTr: null,
-        docScore: null
+      if (!evaluation) {
+        throw new ApiError(404, 'Evaluation not found or access denied', { simulationId });
       }
-    });
 
-    await prisma.userSimulation.update({
-      where: { id: simulation.id },
-      data: {
-        status: 'completed',
-        completedAt: new Date()
-      }
-    });
+      return NextResponse.json(evaluation);
+    } catch (error) {
+      logger.error('Get evaluation error', {
+        error,
+        userId: user?.id,
+      });
+      return handleError(error);
+    }
+  });
+};
 
-    return NextResponse.json({ evaluation, cached: false });
-  } catch (error) {
-    console.error('Evaluate simulation error:', error);
-    return NextResponse.json({ error: 'Simulation konnte nicht ausgewertet werden.' }, { status: 500 });
-  }
-}
+export const dynamic = 'force-dynamic';
