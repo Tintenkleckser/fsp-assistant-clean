@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 import { prisma } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { inspectDatabaseUrl } from '@/lib/database-url';
@@ -23,13 +24,28 @@ async function runCheck(name: string, check: () => Promise<unknown>): Promise<[s
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser();
+  const authCheck = await runCheck('supabase_auth', async () => {
+    const supabase = createClient();
+    const {
+      data: { user },
+      error
+    } = await supabase.auth.getUser();
+
+    return {
+      user,
+      error: error?.message ?? null
+    };
+  });
+
+  const authDetail = authCheck[1].ok ? authCheck[1].detail as {
+    user: User | null;
+    error: string | null;
+  } : null;
+  const user = authDetail?.user ?? null;
+  const authError = authDetail?.error ?? authCheck[1].error ?? null;
 
   const checks = await Promise.all([
+    Promise.resolve(authCheck),
     runCheck('database_connection', async () => {
       const result = await prisma.$queryRaw<Array<{ ok: number }>>`select 1 as ok`;
       return result[0] ?? null;
@@ -104,10 +120,10 @@ export async function GET() {
     branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
     databaseUrl: inspectDatabaseUrl(),
     auth: {
-      ok: Boolean(user) && !authError,
+      ok: Boolean(user) && !authError && authCheck[1].ok,
       userIdPresent: Boolean(user?.id),
       emailPresent: Boolean(user?.email),
-      error: authError?.message ?? null
+      error: authError
     },
     checks: checkObject,
     timestamp: new Date().toISOString()

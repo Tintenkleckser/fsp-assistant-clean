@@ -1,15 +1,31 @@
+import type { User } from '@supabase/supabase-js';
 import { prisma } from '@/lib/db';
 import { createClient } from './server';
 
 export async function getAuthUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error
-  } = await supabase.auth.getUser();
+  let user: User;
 
-  if (error || !user) {
-    return null;
+  try {
+    const supabase = createClient();
+    const {
+      data: { user: authUser },
+      error
+    } = await supabase.auth.getUser();
+
+    if (error || !authUser) {
+      return null;
+    }
+
+    user = authUser;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("project's URL and Key are required")
+    ) {
+      return null;
+    }
+
+    throw error;
   }
 
   let profile = await prisma.profile.findUnique({
