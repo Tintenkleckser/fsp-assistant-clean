@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   return NextResponse.json({
     app: 'fsp-assistant-clean',
-    expectedCommit: 'fb98cd1',
+    expectedCommit: '18de3b5-or-newer',
     expectedFix: 'dual Supabase SSR cookie adapter',
     vercelCommit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     vercelBranch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
