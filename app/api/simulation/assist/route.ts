@@ -1,114 +1,118 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/supabase/auth-helpers';
+import { NextResponse } from 'next/server';
+import { withAuth, handleError, ApiError } from '@/lib/api/middleware';
 import { prisma } from '@/lib/db';
+import { AssistRequestSchema } from '@/lib/schemas';
+import { logger } from '@/lib/logger';
+import { mistral } from '@/lib/mistral';
 
-export const dynamic = 'force-dynamic';
+/**
+ * POST /api/simulation/assist
+ * Provides AI assistance during a simulation
+ * Uses streaming for real-time response delivery
+ */
+export const POST = async (req: Request) => {
+  return withAuth(async (user) => {
+    try {
+      // Validate request body
+      const body = await req.json();
+      const { simulationId, message } = AssistRequestSchema.parse(body);
 
-const MODES = {
-  explain: 'Erkläre die letzte KI-Antwort didaktisch auf Deutsch. Nutze bei schwierigen Begriffen eine kurze türkische Erklärung.',
-  translate: 'Übersetze die letzte KI-Antwort ins Türkische und nenne danach 3 wichtige deutsche Ausdrücke mit türkischer Bedeutung.',
-  follow_up: 'Beantworte die Nachfrage des Users zur letzten KI-Antwort. Bleibe lernorientiert und knapp.'
+      // Verify simulation exists and belongs to user
+      const simulation = await prisma.simulation.findFirst({
+        where: {
+          id: simulationId,
+          userId: user.id,
+        },
+        include: {
+          template: {
+            select: {
+              systemPrompt: true,
+              type: true,
+              difficulty: true,
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 10, // Limit context window
+          },
+        },
+      });
+
+      if (!simulation) {
+        throw new ApiError(404, 'Simulation not found or access denied', { simulationId });
+      }
+
+      logger.info('AI assistance requested', {
+        userId: user.id,
+        simulationId,
+        messageLength: message.length,
+      });
+
+      // Build context from previous messages
+      const contextMessages = simulation.messages.map((msg) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      }));
+
+      // Add system prompt if available
+      if (simulation.template?.systemPrompt) {
+        contextMessages.unshift({
+          role: 'system' as const,
+          content: simulation.template.systemPrompt,
+        });
+      }
+
+      // Add current user message
+      contextMessages.push({ role: 'user' as const, content: message });
+
+      // Get streaming response from Mistral
+      const stream = await mistral.stream({
+        messages: contextMessages,
+        options: {
+          temperature: 0.7,
+          maxTokens: 1000,
+        },
+      });
+
+      // Save user message to database
+      await prisma.message.create({
+        data: {
+          role: 'user',
+          content: message,
+          simulationId,
+        },
+      });
+
+      logger.info('AI assistance streaming started', {
+        userId: user.id,
+        simulationId,
+      });
+
+      // Return streaming response
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    } catch (error) {
+      logger.error('AI assistance error', {
+        error,
+        userId: user?.id,
+        requestBody: await req.json().catch(() => null),
+      });
+      return handleError(error);
+    }
+  });
 };
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getAuthUser();
+// Disable GET for this endpoint
+export const GET = async () => {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405 }
+  );
+};
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!process.env.MISTRAL_API_KEY) {
-      return NextResponse.json({ error: 'MISTRAL_API_KEY fehlt in Vercel.' }, { status: 500 });
-    }
-
-    const body = await request.json();
-    const simId = String(body?.simId ?? '');
-    const interactionId = String(body?.interactionId ?? '');
-    const mode = String(body?.mode ?? '') as keyof typeof MODES;
-    const question = String(body?.question ?? '').trim();
-
-    if (!simId || !interactionId || !MODES[mode]) {
-      return NextResponse.json({ error: 'simId, interactionId and mode are required' }, { status: 400 });
-    }
-
-    if (mode === 'follow_up' && !question) {
-      return NextResponse.json({ error: 'Bitte geben Sie eine Nachfrage ein.' }, { status: 400 });
-    }
-
-    const simulation = await prisma.userSimulation.findFirst({
-      where: { id: simId, userId: user.id },
-      include: {
-        template: true,
-        interactions: { orderBy: { turnNumber: 'asc' } }
-      }
-    });
-
-    if (!simulation) {
-      return NextResponse.json({ error: 'Simulation not found' }, { status: 404 });
-    }
-
-    const interaction = simulation.interactions.find((item) => item.id === interactionId);
-
-    if (!interaction) {
-      return NextResponse.json({ error: 'Antwort nicht gefunden.' }, { status: 404 });
-    }
-
-    const transcript = simulation.interactions
-      .map((item) => `Kandidat: ${item.userInput}\nKI-Rolle: ${item.aiResponse}`)
-      .join('\n\n');
-
-    const prompt = `Du bist ein zweisprachiger FSP-Lerncoach für Ärztinnen und Ärzte aus der Türkei.
-
-WICHTIG:
-- Du bist hier nicht die Prüfungsrolle, sondern erklärst eine bereits gegebene KI-Antwort.
-- Verändere die laufende Simulation nicht.
-- Gib eine kurze, klare Lernhilfe.
-- Wenn du Türkisch nutzt, dann als Hilfe zum Verstehen, nicht als Ersatz für die deutsche Prüfungsantwort.
-
-ÜBUNG:
-${simulation.template.titleDe}
-
-BISHERIGER VERLAUF:
-${transcript}
-
-ANTWORT, ZU DER HILFE ANGEFORDERT WURDE:
-${interaction.aiResponse}
-
-AUFGABE:
-${MODES[mode]}
-
-NACHFRAGE DES USERS:
-${question || 'Keine zusätzliche Nachfrage.'}
-
-Antworte mit gut lesbarem Markdown.`;
-
-    const llmResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'mistral-large-latest',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 900,
-        temperature: 0.3
-      })
-    });
-
-    if (!llmResponse.ok) {
-      const message = await llmResponse.text().catch(() => '');
-      console.error('Simulation assist error:', llmResponse.status, message);
-      return NextResponse.json({ error: 'LLM-API-Fehler bei der Lernhilfe.' }, { status: 502 });
-    }
-
-    const data = await llmResponse.json();
-    const answer = String(data?.choices?.[0]?.message?.content ?? '').trim();
-
-    return NextResponse.json({ answer });
-  } catch (error) {
-    console.error('Simulation assist route error:', error);
-    return NextResponse.json({ error: 'Lernhilfe konnte nicht erstellt werden.' }, { status: 500 });
-  }
-}
+export const dynamic = 'force-dynamic';
